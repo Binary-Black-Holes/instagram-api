@@ -1,4 +1,5 @@
 import type { QueryParams } from '../types/common.js';
+import queryString from 'query-string';
 
 /**
  * Builds a query string from a parameter object, omitting undefined values.
@@ -7,17 +8,7 @@ import type { QueryParams } from '../types/common.js';
  * @returns URL-encoded query string without leading `?`.
  */
 export function buildQueryString(params: QueryParams = {}): string {
-  const searchParams = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    if (value === undefined) {
-      continue;
-    }
-
-    searchParams.set(key, String(value));
-  }
-
-  return searchParams.toString();
+  return queryString.stringify(params, { sort: false });
 }
 
 /**
