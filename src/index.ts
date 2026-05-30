@@ -1,0 +1,160 @@
+/**
+ * @packageDocumentation
+ * Type-safe, class-oriented Instagram Graph API integration module.
+ *
+ * @module @binary-black-holes/instagram-api
+ */
+
+export { InstagramClient } from './client/index.js';
+export { OAuthProvider } from './auth/index.js';
+export { HttpClient } from './http/index.js';
+
+export {
+  InstagramApiError,
+  AuthenticationError,
+  RateLimitError,
+  ValidationError,
+  NotFoundError,
+  createErrorFromResponse,
+} from './errors/index.js';
+
+export {
+  BaseResource,
+  UsersResource,
+  MediaResource,
+  InsightsResource,
+  CommerceResource,
+  MessagingResource,
+  WebhooksResource,
+} from './resources/index.js';
+
+export {
+  verifyWebhookSignature,
+  verifyWebhookChallenge,
+  parseWebhookPayload,
+  parseVerifiedWebhookPayload,
+} from './webhooks/index.js';
+
+export type {
+  GraphApiVersion,
+  PaginatedResponse,
+  PaginationCursors,
+  PaginationOptions,
+  GraphApiErrorBody,
+  GraphApiErrorResponse,
+  HttpMethod,
+  QueryParams,
+  HttpRequestConfig,
+  HttpResponse,
+  Logger,
+  RetryPolicy,
+  HttpClientHooks,
+  InstagramClientConfig,
+  OAuthConfig,
+  AuthorizationUrlOptions,
+  AccessTokenResponse,
+  LongLivedTokenResponse,
+  TokenDebugInfo,
+  InstagramUser,
+  InstagramUserField,
+  GetProfileOptions,
+  ListUserMediaOptions,
+  UserMediaResponse,
+  MediaType,
+  InstagramMedia,
+  InstagramMediaField,
+  GetMediaOptions,
+  ListMediaCommentsOptions,
+  InstagramComment,
+  CreateImageMediaInput,
+  CreateStoryMediaInput,
+  CreateVideoMediaInput,
+  CreateCarouselItemInput,
+  CreateCarouselContainerInput,
+  CreateResumableUploadInput,
+  ResumableUploadSessionResponse,
+  UploadResumableVideoInput,
+  ReplyToCommentInput,
+  CommentReplyResponse,
+  MediaContainerResponse,
+  PublishMediaResponse,
+  MediaContainerStatus,
+  WaitForContainerReadyOptions,
+  PublishWhenReadyOptions,
+  PublishingQuotaSummary,
+  ConnectedFacebookPage,
+  ConnectedFacebookPageField,
+  ListConnectedAccountsOptions,
+  ConnectedAccountsResponse,
+  ContentPublishingConfig,
+  ContentPublishingLimit,
+  ContentPublishingLimitResponse,
+  ContentPublishingLimitOptions,
+  InstagramCatalog,
+  CatalogProduct,
+  ProductTag,
+  ProductTagInput,
+  AvailableCatalogsResponse,
+  CatalogProductSearchResponse,
+  ProductTagsResponse,
+  CatalogProductSearchOptions,
+  SendMessageResponse,
+  SendTextMessageInput,
+  SendMediaShareInput,
+  SendPrivateReplyInput,
+  WebhookField,
+  SubscribeWebhooksOptions,
+  WebhookSubscriptionResponse,
+  SubscribedApp,
+  SubscribedAppsResponse,
+  WebhookChallengeQuery,
+  InstagramWebhookPayload,
+  InstagramWebhookEntry,
+  InstagramWebhookChange,
+  InstagramWebhookMessagingEvent,
+  DiscoveredBusiness,
+  BusinessDiscoveryField,
+  BusinessDiscoveryOptions,
+  BusinessDiscoveryResponse,
+  UserInsightMetric,
+  DeprecatedUserInsightMetric,
+  MediaInsightMetric,
+  DeprecatedMediaInsightMetric,
+  InsightMetric,
+  InsightPeriod,
+  InsightTimeframe,
+  UserInsightBreakdown,
+  DemographicInsightBreakdown,
+  InsightMetricType,
+  InsightBreakdown,
+  InsightValue,
+  InsightMetricResult,
+  InsightsResponse,
+  UserInsightsOptions,
+  MediaInsightsOptions,
+} from './types/index.js';
+
+export {
+  DEFAULT_OAUTH_SCOPES,
+  DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES,
+  GRAPH_API_BASE_URL,
+  OAUTH_DIALOG_URL,
+  RUPLOAD_BASE_URL,
+} from './types/index.js';
+
+export {
+  buildQueryString,
+  joinUrl,
+  parseRetryAfterMs,
+  sleep,
+  resolveFields,
+  pickDefined,
+  buildBusinessDiscoveryFields,
+  serializeCarouselChildren,
+  serializeProductTags,
+  extractPublishingQuota,
+} from './utils/index.js';
+export { iteratePages, collectAllPages } from './utils/index.js';
+export type { WithoutUndefined } from './utils/index.js';
+
+export const VERSION = '0.1.0';
