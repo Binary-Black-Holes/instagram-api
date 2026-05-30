@@ -1,0 +1,24 @@
+---
+description: Instagram API SDK context for AI agents — read AGENTS.md before integrating or modifying this package
+alwaysApply: true
+---
+
+# @binary-black-holes/instagram-api
+
+Before writing integration code or modifying this package, read [AGENTS.md](../../AGENTS.md) and [docs/AI_AGENT_GUIDE.md](../../docs/AI_AGENT_GUIDE.md).
+
+## Non-negotiable rules
+
+1. `InstagramClient` requires a **Page access token** and `instagram_business_account.id` from `OAuthProvider.listConnectedAccounts()` — never a raw user token.
+2. This SDK targets **Instagram Graph API with Facebook Login** — not Basic Display or Instagram Login-only.
+3. Publishing is multi-step: `create*Container()` → `publishWhenReady()` / `waitForContainerReady()` + `publish()`.
+4. Prefer `views` over deprecated `impressions` for insights.
+5. Webhook POST handlers must verify signatures against the **raw body** via `parseVerifiedWebhookPayload()`.
+6. New resource methods need JSDoc with Graph API path, input validation, tests with `createMockAxios()`, and exports in `src/index.ts`.
+
+## Key files
+
+- Entry: `src/index.ts`, `src/client/InstagramClient.ts`
+- Resources: `src/resources/*.ts`
+- Types: `src/types/*.ts`
+- Meta mapping: `docs/API_ALIGNMENT.md`

@@ -2,6 +2,8 @@
 
 This document maps `@binary-black-holes/instagram-api` to Meta's official [Instagram Platform](https://developers.facebook.com/docs/instagram-platform) documentation and records deliberate SDK choices.
 
+For AI agent integration guidance, see [AGENTS.md](../AGENTS.md) and [AI_AGENT_GUIDE.md](./AI_AGENT_GUIDE.md).
+
 ## Platform scope
 
 | Topic | SDK coverage | Meta documentation |

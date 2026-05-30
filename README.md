@@ -4,6 +4,14 @@ Type-safe, class-oriented Instagram Graph API integration module for Node.js 18+
 
 Built with Vite library mode, rich TypeScript interfaces, declarative JSDoc, and semantic versioning.
 
+## Documentation for AI agents
+
+If you are an AI coding agent (or prompting one) to integrate or extend this package, start with:
+
+- **[AGENTS.md](./AGENTS.md)** — scope, constraints, decision trees, anti-patterns
+- **[docs/AI_AGENT_GUIDE.md](./docs/AI_AGENT_GUIDE.md)** — full method catalog, types, workflows, test patterns
+- **[docs/API_ALIGNMENT.md](./docs/API_ALIGNMENT.md)** — Meta endpoint mapping and production checklist
+
 ## Features
 
 - **Class-oriented architecture** — `InstagramClient` exposes focused resource modules (`users`, `media`, `insights`)
