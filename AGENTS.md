@@ -13,7 +13,7 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
 | Field               | Value                                               |
 | ------------------- | --------------------------------------------------- |
 | **npm name**        | `@binary-black-holes/instagram-api`                 |
-| **Version**         | `0.1.0` (also exported as `VERSION` constant)       |
+| **Version**         | `0.2.0` (also exported as `VERSION` constant)       |
 | **Runtime**         | Node.js 18+                                         |
 | **Module format**   | ESM primary (`import`), CJS supported (`require`)   |
 | **Entry point**     | `src/index.ts` → `dist/index.js` / `dist/index.cjs` |
@@ -26,28 +26,28 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
 
 ### In scope
 
-- Instagram **Business** and **Creator** accounts linked to a Facebook Page
-- Graph API operations via a **Page access token** + `instagram_business_account.id`
-- OAuth (Facebook Login), token lifecycle, account discovery
+- Instagram **Business** and **Creator** accounts
+- Facebook Login operations via a **Page access token** + `instagram_business_account.id`
+- Instagram Login operations via an **Instagram User access token** and `/me`
+- OAuth for Facebook Login and Instagram Login, token lifecycle, account discovery where applicable
 - Users, media, publishing, insights, commerce, messaging, webhook subscriptions
 - Webhook signature verification and challenge helpers (server-side)
 - Typed errors, pagination helpers, retry policy
 
 ### Out of scope — do NOT suggest or implement these as SDK features
 
-| Not supported                                   | Alternative                                   |
-| ----------------------------------------------- | --------------------------------------------- |
-| Instagram Basic Display API                     | Use Meta's Basic Display docs directly        |
-| Instagram Login-only product (no Facebook Page) | Different OAuth product; not this SDK         |
-| User access token for `InstagramClient`         | Use Page token from `listConnectedAccounts()` |
-| Hosting webhook HTTP routes                     | App responsibility; SDK only verifies/parses  |
-| App Review, catalog setup, 24h messaging policy | Meta dashboard / app logic                    |
+| Not supported                                   | Alternative                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------- |
+| Instagram Basic Display API                     | Use Meta's Basic Display docs directly                           |
+| Raw Facebook user token for `InstagramClient`   | Use Page token from `listConnectedAccounts()` for Facebook Login |
+| Hosting webhook HTTP routes                     | App responsibility; SDK only verifies/parses                     |
+| App Review, catalog setup, 24h messaging policy | Meta dashboard / app logic                                       |
 
 ---
 
 ## Critical constraints (read before writing code)
 
-1. **`InstagramClient` requires a Page access token**, not a user token. Resolve via:
+1. **Facebook Login `InstagramClient` requires a Page access token**, not a Facebook user token. Resolve via:
 
    ```ts
    const accounts = await oauth.listConnectedAccounts(userAccessToken);
@@ -55,9 +55,12 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
    // page.access_token + page.instagram_business_account.id
    ```
 
-2. **Two OAuth scope presets exist** — pick the one matching the Meta app configuration:
+   For Instagram Login, set `loginType: "instagram"` and pass an Instagram User access token; `instagramAccountId` is optional and defaults to `/me`.
+
+2. **Three OAuth scope presets exist** — pick the one matching the Meta app configuration:
    - `DEFAULT_OAUTH_SCOPES` — legacy Facebook Login apps
-   - `DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES` — current business permission set
+   - `DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES` — current Facebook Login business permission set
+   - `DEFAULT_INSTAGRAM_LOGIN_SCOPES` — Instagram Login default scope
 
 3. **Publishing is multi-step** for video/reels/carousel/resumable uploads:
    `create*Container()` → `waitForContainerReady()` / `publishWhenReady()` → optional quota check
@@ -76,10 +79,10 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
 OAuthProvider                    InstagramClient
 ├── getAuthorizationUrl()        ├── users      → profile, listMedia, discoverBusiness
 ├── exchangeCodeForToken()       ├── media      → CRUD, publish, comments, resumable upload
-├── exchangeForLongLivedToken()  ├── insights   → user + media analytics
-├── list
-listConnectedAccounts()          ├── commerce   → catalogs, product tags
-└── debugToken()                 ├── messaging  → DM, media share, private replies
+├── exchangeForLongLivedToken()  ├── hashtags   → search, recent media, top media
+├── listConnectedAccounts()      ├── insights   → user + media analytics
+└── debugToken()                 ├── commerce   → catalogs, product tags
+                                 ├── messaging  → DM, media share, private replies
                                  └── webhooks   → subscribe/unsubscribe (Graph API)
 
 Standalone webhook helpers: verifyWebhookChallenge, verifyWebhookSignature,
@@ -184,16 +187,16 @@ try {
 
 Import everything from `@binary-black-holes/instagram-api`:
 
-| Category       | Exports                                                                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| **Clients**    | `InstagramClient`, `OAuthProvider`, `HttpClient`                                                                                           |
-| **Resources**  | `BaseResource`, `UsersResource`, `MediaResource`, `InsightsResource`, `CommerceResource`, `MessagingResource`, `WebhooksResource`          |
-| **Errors**     | `InstagramApiError`, `AuthenticationError`, `RateLimitError`, `ValidationError`, `NotFoundError`, `createErrorFromResponse`                |
-| **Webhooks**   | `verifyWebhookSignature`, `verifyWebhookChallenge`, `parseWebhookPayload`, `parseVerifiedWebhookPayload`                                   |
-| **Pagination** | `iteratePages`, `collectAllPages`                                                                                                          |
-| **Constants**  | `VERSION`, `DEFAULT_OAUTH_SCOPES`, `DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES`, `GRAPH_API_BASE_URL`, `OAUTH_DIALOG_URL`, `RUPLOAD_BASE_URL` |
-| **Utils**      | `buildQueryString`, `joinUrl`, `resolveFields`, `pickDefined`, `extractPublishingQuota`, etc.                                              |
-| **Types**      | 80+ exported types — see `src/index.ts` and `docs/AI_AGENT_GUIDE.md`                                                                       |
+| Category       | Exports                                                                                                                                                                                                                                                                    |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Clients**    | `InstagramClient`, `OAuthProvider`, `HttpClient`                                                                                                                                                                                                                           |
+| **Resources**  | `BaseResource`, `UsersResource`, `MediaResource`, `HashtagsResource`, `InsightsResource`, `CommerceResource`, `MessagingResource`, `WebhooksResource`                                                                                                                      |
+| **Errors**     | `InstagramApiError`, `AuthenticationError`, `RateLimitError`, `ValidationError`, `NotFoundError`, `createErrorFromResponse`                                                                                                                                                |
+| **Webhooks**   | `verifyWebhookSignature`, `verifyWebhookChallenge`, `parseWebhookPayload`, `parseVerifiedWebhookPayload`                                                                                                                                                                   |
+| **Pagination** | `iteratePages`, `collectAllPages`                                                                                                                                                                                                                                          |
+| **Constants**  | `VERSION`, `DEFAULT_OAUTH_SCOPES`, `DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES`, `DEFAULT_INSTAGRAM_LOGIN_SCOPES`, `GRAPH_API_BASE_URL`, `INSTAGRAM_GRAPH_API_BASE_URL`, `OAUTH_DIALOG_URL`, `INSTAGRAM_OAUTH_DIALOG_URL`, `INSTAGRAM_OAUTH_API_BASE_URL`, `RUPLOAD_BASE_URL` |
+| **Utils**      | `buildQueryString`, `joinUrl`, `resolveFields`, `pickDefined`, `extractPublishingQuota`, etc.                                                                                                                                                                              |
+| **Types**      | 80+ exported types — see `src/index.ts` and `docs/AI_AGENT_GUIDE.md`                                                                                                                                                                                                       |
 
 ---
 
@@ -254,15 +257,16 @@ npm run build       # typecheck + vite library build → dist/
 
 ## Anti-patterns (avoid generating these)
 
-| Wrong                                             | Right                                               |
-| ------------------------------------------------- | --------------------------------------------------- |
-| `new InstagramClient({ accessToken: userToken })` | Page token from `listConnectedAccounts()`           |
-| `client.media.publish(imageUrl)`                  | `createImageContainer` then `publish(containerId)`  |
-| Using Basic Display API endpoints                 | This SDK's Graph API resources only                 |
-| Parsing webhook JSON before signature check       | `parseVerifiedWebhookPayload(rawBody, …)`           |
-| Requesting deprecated `impressions` metric        | Use `views`                                         |
-| Adding `fetch` instead of Axios                   | Extend `HttpClient` or pass custom `axios` instance |
-| Creating a second HTTP client per resource        | Resources share `InstagramClient`'s `HttpClient`    |
+| Wrong                                                      | Right                                                             |
+| ---------------------------------------------------------- | ----------------------------------------------------------------- |
+| `new InstagramClient({ accessToken: facebookUserToken })`  | For Facebook Login, use Page token from `listConnectedAccounts()` |
+| `new InstagramClient({ accessToken: instagramUserToken })` | For Instagram Login, also set `loginType: "instagram"`            |
+| `client.media.publish(imageUrl)`                           | `createImageContainer` then `publish(containerId)`                |
+| Using Basic Display API endpoints                          | This SDK's Graph API resources only                               |
+| Parsing webhook JSON before signature check                | `parseVerifiedWebhookPayload(rawBody, …)`                         |
+| Requesting deprecated `impressions` metric                 | Use `views`                                                       |
+| Adding `fetch` instead of Axios                            | Extend `HttpClient` or pass custom `axios` instance               |
+| Creating a second HTTP client per resource                 | Resources share `InstagramClient`'s `HttpClient`                  |
 
 ---
 

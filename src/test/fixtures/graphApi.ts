@@ -28,6 +28,31 @@ export const publishingQuota = {
   ],
 };
 
+export const hashtagSearch = {
+  data: [
+    {
+      id: '17841593698074073',
+      name: 'coke',
+    },
+  ],
+};
+
+export const hashtagRecentMedia = {
+  data: [
+    {
+      id: '17880997618081620',
+      media_type: 'IMAGE',
+      comments_count: 84,
+      like_count: 177,
+    },
+  ],
+  paging: {
+    cursors: {
+      after: 'after-cursor',
+    },
+  },
+};
+
 export const connectedAccounts = {
   data: [
     {

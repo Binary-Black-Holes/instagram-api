@@ -6,13 +6,19 @@ import type {
 import type {
   AuthorizationUrlOptions,
   AccessTokenResponse,
+  InstagramLoginAccessTokenResponse,
   LongLivedTokenResponse,
+  LoginType,
   OAuthConfig,
   TokenDebugInfo,
 } from '../types/common.js';
 import {
   DEFAULT_OAUTH_SCOPES,
+  DEFAULT_INSTAGRAM_LOGIN_SCOPES,
   GRAPH_API_BASE_URL,
+  INSTAGRAM_GRAPH_API_BASE_URL,
+  INSTAGRAM_OAUTH_API_BASE_URL,
+  INSTAGRAM_OAUTH_DIALOG_URL,
   OAUTH_DIALOG_URL,
 } from '../types/common.js';
 import { ValidationError } from '../errors/index.js';
@@ -28,6 +34,7 @@ import { buildQueryString, joinUrl, resolveFields } from '../utils/url.js';
  * @see https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/business-login-for-instagram
  */
 export class OAuthProvider {
+  private readonly loginType: LoginType;
   private readonly clientId: string;
   private readonly clientSecret: string;
   private readonly redirectUri: string;
@@ -39,10 +46,13 @@ export class OAuthProvider {
    * @param config - OAuth provider configuration.
    */
   constructor(config: OAuthConfig) {
+    this.loginType = config.loginType ?? 'facebook';
     this.clientId = config.clientId;
     this.clientSecret = config.clientSecret;
     this.redirectUri = config.redirectUri;
-    this.scopes = config.scopes ?? DEFAULT_OAUTH_SCOPES;
+    this.scopes =
+      config.scopes ??
+      (this.loginType === 'instagram' ? DEFAULT_INSTAGRAM_LOGIN_SCOPES : DEFAULT_OAUTH_SCOPES);
     this.apiVersion = config.apiVersion ?? 'v21.0';
     this.axios =
       config.axios ??
@@ -71,7 +81,12 @@ export class OAuthProvider {
       auth_type: options.forceReauth ? 'rerequest' : undefined,
     });
 
-    return `${joinUrl(OAUTH_DIALOG_URL, this.apiVersion, 'dialog/oauth')}?${params}`;
+    const base =
+      this.loginType === 'instagram'
+        ? joinUrl(INSTAGRAM_OAUTH_DIALOG_URL, 'oauth/authorize')
+        : joinUrl(OAUTH_DIALOG_URL, this.apiVersion, 'dialog/oauth');
+
+    return `${base}?${params}`;
   }
 
   /**
@@ -85,7 +100,11 @@ export class OAuthProvider {
       throw new ValidationError('Authorization code must be a non-empty string.');
     }
 
-    return this.postOAuth<AccessTokenResponse>('oauth/access_token', {
+    if (this.loginType === 'instagram') {
+      return this.exchangeInstagramCodeForToken(code);
+    }
+
+    return this.postFacebookOAuth<AccessTokenResponse>('oauth/access_token', {
       client_id: this.clientId,
       client_secret: this.clientSecret,
       redirect_uri: this.redirectUri,
@@ -104,7 +123,15 @@ export class OAuthProvider {
       throw new ValidationError('Short-lived token must be a non-empty string.');
     }
 
-    return this.getOAuth<LongLivedTokenResponse>('oauth/access_token', {
+    if (this.loginType === 'instagram') {
+      return this.getInstagramGraph<LongLivedTokenResponse>('access_token', {
+        grant_type: 'ig_exchange_token',
+        client_secret: this.clientSecret,
+        access_token: shortLivedToken,
+      });
+    }
+
+    return this.getFacebookOAuth<LongLivedTokenResponse>('oauth/access_token', {
       grant_type: 'fb_exchange_token',
       client_id: this.clientId,
       client_secret: this.clientSecret,
@@ -123,7 +150,14 @@ export class OAuthProvider {
       throw new ValidationError('Long-lived token must be a non-empty string.');
     }
 
-    return this.getOAuth<LongLivedTokenResponse>('oauth/access_token', {
+    if (this.loginType === 'instagram') {
+      return this.getInstagramGraph<LongLivedTokenResponse>('refresh_access_token', {
+        grant_type: 'ig_refresh_token',
+        access_token: longLivedToken,
+      });
+    }
+
+    return this.getFacebookOAuth<LongLivedTokenResponse>('oauth/access_token', {
       grant_type: 'fb_exchange_token',
       client_id: this.clientId,
       client_secret: this.clientSecret,
@@ -139,7 +173,7 @@ export class OAuthProvider {
    * @returns Token debug metadata.
    */
   async debugToken(inputToken: string, accessToken: string): Promise<TokenDebugInfo> {
-    const response = await this.getOAuth<{ data: TokenDebugInfo }>('debug_token', {
+    const response = await this.getFacebookOAuth<{ data: TokenDebugInfo }>('debug_token', {
       input_token: inputToken,
       access_token: accessToken,
     });
@@ -159,6 +193,12 @@ export class OAuthProvider {
     userAccessToken: string,
     options: ListConnectedAccountsOptions = {},
   ): Promise<ConnectedAccountsResponse> {
+    if (this.loginType === 'instagram') {
+      throw new ValidationError(
+        'listConnectedAccounts() is only available with Facebook Login. Instagram Login tokens identify the Instagram user directly.',
+      );
+    }
+
     if (!userAccessToken.trim()) {
       throw new ValidationError('userAccessToken must be a non-empty string.');
     }
@@ -193,7 +233,34 @@ export class OAuthProvider {
     return this.axios;
   }
 
-  private async getOAuth<T>(path: string, params: Record<string, string>): Promise<T> {
+  private async exchangeInstagramCodeForToken(code: string): Promise<InstagramLoginAccessTokenResponse> {
+    const payload = await this.postForm<InstagramLoginAccessTokenResponse | { data: InstagramLoginAccessTokenResponse[] }>(
+      joinUrl(INSTAGRAM_OAUTH_API_BASE_URL, 'oauth/access_token'),
+      {
+        client_id: this.clientId,
+        client_secret: this.clientSecret,
+        grant_type: 'authorization_code',
+        redirect_uri: this.redirectUri,
+        code,
+      },
+    );
+
+    if ('data' in payload && Array.isArray(payload.data)) {
+      const [token] = payload.data;
+      if (!token) {
+        throw new ValidationError('Instagram Login code exchange returned an empty token response.');
+      }
+      return token;
+    }
+
+    if ('access_token' in payload) {
+      return payload;
+    }
+
+    throw new ValidationError('Instagram Login code exchange returned an invalid token response.');
+  }
+
+  private async getFacebookOAuth<T>(path: string, params: Record<string, string>): Promise<T> {
     const query = buildQueryString(params);
     const url = `${joinUrl(GRAPH_API_BASE_URL, this.apiVersion, path)}?${query}`;
     const response = await this.axios.get<T & { error?: { message: string } }>(url);
@@ -206,8 +273,25 @@ export class OAuthProvider {
     return payload;
   }
 
-  private async postOAuth<T>(path: string, params: Record<string, string>): Promise<T> {
+  private async getInstagramGraph<T>(path: string, params: Record<string, string>): Promise<T> {
+    const query = buildQueryString(params);
+    const url = `${joinUrl(INSTAGRAM_GRAPH_API_BASE_URL, path)}?${query}`;
+    const response = await this.axios.get<T & { error?: { message: string } }>(url);
+    const payload = response.data;
+
+    if (response.status < 200 || response.status >= 300 || payload.error) {
+      throw new ValidationError(payload.error?.message ?? `Instagram OAuth request failed with status ${response.status}`);
+    }
+
+    return payload;
+  }
+
+  private async postFacebookOAuth<T>(path: string, params: Record<string, string>): Promise<T> {
     const url = joinUrl(GRAPH_API_BASE_URL, this.apiVersion, path);
+    return this.postForm<T>(url, params);
+  }
+
+  private async postForm<T>(url: string, params: Record<string, string>): Promise<T> {
     const body = new URLSearchParams(params);
     const response = await this.axios.post<T & { error?: { message: string } }>(url, body, {
       headers: {

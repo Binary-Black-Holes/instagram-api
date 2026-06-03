@@ -92,6 +92,8 @@ export class UsersResource extends BaseResource {
    * Graph API: `GET /{ig-user-id}?fields=business_discovery.username(target){...}`
    */
   async discoverBusiness(options: BusinessDiscoveryOptions): Promise<BusinessDiscoveryResponse> {
+    this.assertFacebookLoginOnly('Business discovery');
+
     if (!options.username.trim()) {
       throw new ValidationError('username must be a non-empty string.');
     }

@@ -1,6 +1,7 @@
 import { HttpClient } from '../http/HttpClient.js';
 import {
   CommerceResource,
+  HashtagsResource,
   InsightsResource,
   MediaResource,
   MessagingResource,
@@ -36,6 +37,8 @@ export class InstagramClient {
   readonly users: UsersResource;
   /** Media read, comment moderation, publishing, and resumable uploads. */
   readonly media: MediaResource;
+  /** Hashtag search and public hashtag media operations. */
+  readonly hashtags: HashtagsResource;
   /** Account and media insights operations. */
   readonly insights: InsightsResource;
   /** Product catalogs and product tagging operations. */
@@ -54,20 +57,22 @@ export class InstagramClient {
    * @param config - Client configuration including access token and account ID.
    */
   constructor(config: InstagramClientConfig) {
+    const loginType = config.loginType ?? 'facebook';
     if (!config.accessToken?.trim()) {
       throw new ValidationError('accessToken is required.');
     }
 
-    if (!config.instagramAccountId?.trim()) {
+    if (loginType === 'facebook' && !config.instagramAccountId?.trim()) {
       throw new ValidationError(
         'instagramAccountId is required. Use OAuthProvider.listConnectedAccounts() to resolve it from /me/accounts.',
       );
     }
 
-    this.accountId = config.instagramAccountId;
+    this.accountId = config.instagramAccountId ?? 'me';
     this.http = new HttpClient({
       accessToken: config.accessToken,
       apiVersion: config.apiVersion ?? 'v21.0',
+      loginType,
       ...pickDefined({
         axios: config.axios,
         logger: config.logger,
@@ -79,6 +84,7 @@ export class InstagramClient {
 
     this.users = new UsersResource(this.http, this.accountId);
     this.media = new MediaResource(this.http, this.accountId);
+    this.hashtags = new HashtagsResource(this.http, this.accountId);
     this.insights = new InsightsResource(this.http, this.accountId);
     this.commerce = new CommerceResource(this.http, this.accountId);
     this.messaging = new MessagingResource(this.http, this.accountId);
@@ -105,6 +111,7 @@ export class InstagramClient {
     this.accountId = instagramAccountId;
     this.users.setAccountId(instagramAccountId);
     this.media.setAccountId(instagramAccountId);
+    this.hashtags.setAccountId(instagramAccountId);
     this.insights.setAccountId(instagramAccountId);
     this.commerce.setAccountId(instagramAccountId);
     this.messaging.setAccountId(instagramAccountId);

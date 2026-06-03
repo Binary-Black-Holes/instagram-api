@@ -1,6 +1,6 @@
 {
   "name": "@binary-black-holes/instagram-api",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Type-safe, class-oriented Instagram Graph API integration module",
   "type": "module",
   "main": "./dist/index.cjs",

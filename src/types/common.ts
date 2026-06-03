@@ -15,6 +15,11 @@ export type GraphApiVersion =
   | 'v25.0';
 
 /**
+ * Meta login product used for OAuth and Graph API requests.
+ */
+export type LoginType = 'facebook' | 'instagram';
+
+/**
  * Generic cursor-based pagination envelope returned by Graph API list endpoints.
  */
 export interface PaginatedResponse<T> {
@@ -162,11 +167,18 @@ export interface HttpClientHooks {
  * Core client configuration accepted by {@link InstagramClient}.
  */
 export interface InstagramClientConfig {
-  /** Page access token with Instagram permissions for the connected Page. */
+  /**
+   * Meta login product. Defaults to `facebook` for backwards compatibility.
+   */
+  loginType?: LoginType;
+  /** Page access token for Facebook Login or Instagram User access token for Instagram Login. */
   accessToken: string;
   /** Graph API version. Defaults to `v21.0`. */
   apiVersion?: GraphApiVersion;
-  /** Optional Instagram Business/Creator account ID override. */
+  /**
+   * Instagram Business/Creator account ID. Required for Facebook Login; optional
+   * for Instagram Login, where `/me` can be used for user-scoped endpoints.
+   */
   instagramAccountId?: string;
   /** Custom Axios instance for HTTP transport, interceptors, or testing. */
   axios?: AxiosInstance;
@@ -184,6 +196,10 @@ export interface InstagramClientConfig {
  * OAuth configuration for authorization URL generation and token exchange.
  */
 export interface OAuthConfig {
+  /**
+   * Meta login product. Defaults to `facebook` for backwards compatibility.
+   */
+  loginType?: LoginType;
   /** Meta application client ID. */
   clientId: string;
   /** Meta application client secret. */
@@ -220,6 +236,10 @@ export interface AccessTokenResponse {
   token_type?: string;
   /** Expiration time in seconds, when applicable. */
   expires_in?: number;
+  /** Instagram User ID returned by Instagram Login code exchange. */
+  user_id?: string | number;
+  /** Permissions returned by Instagram Login code exchange. */
+  permissions?: string | string[];
 }
 
 /**
@@ -228,6 +248,15 @@ export interface AccessTokenResponse {
 export interface LongLivedTokenResponse extends AccessTokenResponse {
   /** Absolute expiration timestamp in seconds since epoch. */
   expires_at?: number;
+}
+
+/**
+ * Instagram Login code exchange response. Meta has returned this as either a
+ * flat token object or a `data` array depending on the documentation surface.
+ */
+export interface InstagramLoginAccessTokenResponse extends AccessTokenResponse {
+  user_id: string | number;
+  permissions?: string | string[];
 }
 
 /**
@@ -280,6 +309,15 @@ export const DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES = [
 ] as const;
 
 /**
+ * Default scopes for Instagram API with Instagram Login.
+ *
+ * @see https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/business-login
+ */
+export const DEFAULT_INSTAGRAM_LOGIN_SCOPES = [
+  'instagram_business_basic',
+] as const;
+
+/**
  * Default Graph API base URL builder.
  */
 export const GRAPH_API_BASE_URL = 'https://graph.facebook.com';
@@ -288,6 +326,21 @@ export const GRAPH_API_BASE_URL = 'https://graph.facebook.com';
  * Default Facebook OAuth dialog URL.
  */
 export const OAUTH_DIALOG_URL = 'https://www.facebook.com';
+
+/**
+ * Graph API host used by Instagram API with Instagram Login.
+ */
+export const INSTAGRAM_GRAPH_API_BASE_URL = 'https://graph.instagram.com';
+
+/**
+ * OAuth dialog host used by Instagram API with Instagram Login.
+ */
+export const INSTAGRAM_OAUTH_DIALOG_URL = 'https://api.instagram.com';
+
+/**
+ * Token exchange host used by Instagram API with Instagram Login.
+ */
+export const INSTAGRAM_OAUTH_API_BASE_URL = 'https://api.instagram.com';
 
 /**
  * Resumable upload host used for large video uploads.

@@ -1,5 +1,6 @@
 export type {
   GraphApiVersion,
+  LoginType,
   PaginatedResponse,
   PaginationCursors,
   PaginationOptions,
@@ -16,6 +17,7 @@ export type {
   OAuthConfig,
   AuthorizationUrlOptions,
   AccessTokenResponse,
+  InstagramLoginAccessTokenResponse,
   LongLivedTokenResponse,
   TokenDebugInfo,
 } from './common.js';
@@ -23,8 +25,12 @@ export type {
 export {
   DEFAULT_OAUTH_SCOPES,
   DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES,
+  DEFAULT_INSTAGRAM_LOGIN_SCOPES,
   GRAPH_API_BASE_URL,
   OAUTH_DIALOG_URL,
+  INSTAGRAM_GRAPH_API_BASE_URL,
+  INSTAGRAM_OAUTH_DIALOG_URL,
+  INSTAGRAM_OAUTH_API_BASE_URL,
   RUPLOAD_BASE_URL,
 } from './common.js';
 
@@ -60,6 +66,15 @@ export type {
   PublishWhenReadyOptions,
   PublishingQuotaSummary,
 } from './media.js';
+
+export type {
+  InstagramHashtag,
+  InstagramHashtagField,
+  GetHashtagOptions,
+  HashtagSearchResponse,
+  HashtagMediaOptions,
+  HashtagMediaResponse,
+} from './hashtag.js';
 
 export type {
   UserInsightMetric,

@@ -6,10 +6,15 @@ import type {
   GraphApiVersion,
   HttpRequestConfig,
   HttpResponse,
+  LoginType,
   Logger,
   RetryPolicy,
 } from '../types/common.js';
-import { GRAPH_API_BASE_URL, RUPLOAD_BASE_URL } from '../types/common.js';
+import {
+  GRAPH_API_BASE_URL,
+  INSTAGRAM_GRAPH_API_BASE_URL,
+  RUPLOAD_BASE_URL,
+} from '../types/common.js';
 import { pickDefined } from '../utils/pickDefined.js';
 import { buildQueryString, joinUrl, parseRetryAfterMs, sleep } from '../utils/url.js';
 
@@ -89,6 +94,8 @@ function getRetryAfterMs(headers: Record<string, string>): number | undefined {
 export class HttpClient {
   private accessToken: string;
   private readonly apiVersion: GraphApiVersion;
+  private readonly loginType: LoginType;
+  private readonly graphApiBaseUrl: string;
   private readonly axios: AxiosInstance;
   private readonly logger: Logger;
   private readonly timeoutMs: number;
@@ -101,6 +108,7 @@ export class HttpClient {
   constructor(config: {
     accessToken: string;
     apiVersion: GraphApiVersion;
+    loginType?: LoginType;
     axios?: AxiosInstance;
     logger?: Logger;
     timeoutMs?: number;
@@ -109,6 +117,9 @@ export class HttpClient {
   }) {
     this.accessToken = config.accessToken;
     this.apiVersion = config.apiVersion;
+    this.loginType = config.loginType ?? 'facebook';
+    this.graphApiBaseUrl =
+      this.loginType === 'instagram' ? INSTAGRAM_GRAPH_API_BASE_URL : GRAPH_API_BASE_URL;
     this.timeoutMs = config.timeoutMs ?? 30_000;
     this.logger = config.logger ?? new ConsoleLogger();
     Object.assign(this, pickDefined({ hooks: config.hooks }));
@@ -148,6 +159,13 @@ export class HttpClient {
    */
   getApiVersion(): GraphApiVersion {
     return this.apiVersion;
+  }
+
+  /**
+   * Returns the configured Meta login product.
+   */
+  getLoginType(): LoginType {
+    return this.loginType;
   }
 
   /**
@@ -310,7 +328,7 @@ export class HttpClient {
    * @returns Fully qualified request URL.
    */
   buildUrl(path: string, params: Record<string, string | number | boolean | undefined> = {}): string {
-    const base = joinUrl(GRAPH_API_BASE_URL, this.apiVersion, path.replace(/^\//, ''));
+    const base = joinUrl(this.graphApiBaseUrl, this.apiVersion, path.replace(/^\//, ''));
     const query = buildQueryString(params);
     return query ? `${base}?${query}` : base;
   }

@@ -16,7 +16,8 @@ If you are an AI coding agent (or prompting one) to integrate or extend this pac
 
 - **Class-oriented architecture** — `InstagramClient` exposes focused resource modules (`users`, `media`, `insights`)
 - **Rich TypeScript interfaces** — strongly typed requests, responses, pagination, and OAuth payloads
-- **OAuth helpers** — authorization URLs, code exchange, long-lived tokens, and token debugging
+- **Dual login support** — Facebook Login with Page tokens or Instagram Login with Instagram User tokens
+- **OAuth helpers** — authorization URLs, code exchange, long-lived tokens, refresh, and token debugging
 - **Resilient HTTP layer** — Axios-based transport with configurable timeouts, retries, and typed error mapping
 - **Dual package exports** — ESM (`import`) and CommonJS (`require`) with declaration files
 - **Pagination utilities** — async iteration and collection helpers for cursor-based endpoints
@@ -26,7 +27,8 @@ If you are an AI coding agent (or prompting one) to integrate or extend this pac
 - Node.js 18 or newer
 - Axios (installed automatically as a dependency)
 - A Meta developer app with Instagram Graph API access
-- An Instagram Business or Creator account connected to a Facebook Page
+- An Instagram Business or Creator account
+- For Facebook Login: the Instagram account must be connected to a Facebook Page
 
 ## Installation
 
@@ -34,7 +36,7 @@ If you are an AI coding agent (or prompting one) to integrate or extend this pac
 npm install @binary-black-holes/instagram-api
 ```
 
-## Quick start
+## Quick Start: Facebook Login
 
 ```ts
 import { InstagramClient, OAuthProvider } from '@binary-black-holes/instagram-api';
@@ -63,14 +65,40 @@ const mediaPage = await client.users.listMedia({ limit: 25 });
 console.log(profile.username, mediaPage.data.length);
 ```
 
+## Quick Start: Instagram Login
+
+```ts
+import { InstagramClient, OAuthProvider } from '@binary-black-holes/instagram-api';
+
+const oauth = new OAuthProvider({
+  loginType: 'instagram',
+  clientId: process.env.INSTAGRAM_APP_ID!,
+  clientSecret: process.env.INSTAGRAM_APP_SECRET!,
+  redirectUri: 'https://example.com/auth/instagram/callback',
+});
+
+const authUrl = oauth.getAuthorizationUrl({ state: 'secure-random-state' });
+const shortLived = await oauth.exchangeCodeForToken(code);
+const longLived = await oauth.exchangeForLongLivedToken(shortLived.access_token);
+
+const client = new InstagramClient({
+  loginType: 'instagram',
+  accessToken: longLived.access_token,
+  apiVersion: 'v25.0',
+});
+
+const profile = await client.users.getProfile({ fields: ['id', 'username'] });
+```
+
 ## OAuth flow
 
-Use `OAuthProvider` to implement the standard authorization code flow:
+Use `OAuthProvider` to implement either Meta login product. Facebook Login is the default and discovers a Page access token; Instagram Login is opt-in and uses Instagram User access tokens directly.
 
 ```ts
 import { OAuthProvider } from '@binary-black-holes/instagram-api';
 
 const oauth = new OAuthProvider({
+  loginType: 'facebook', // or 'instagram'
   clientId: process.env.META_APP_ID!,
   clientSecret: process.env.META_APP_SECRET!,
   redirectUri: 'https://example.com/auth/instagram/callback',
@@ -84,11 +112,14 @@ const shortLived = await oauth.exchangeCodeForToken(req.query.code);
 
 // 3. Upgrade to long-lived token (~60 days)
 const longLived = await oauth.exchangeForLongLivedToken(shortLived.access_token);
+
+// 4. Refresh long-lived tokens before expiry
+const refreshed = await oauth.refreshLongLivedToken(longLived.access_token);
 ```
 
 ### Default scopes
 
-The SDK ships with two scope presets:
+The SDK ships with three scope presets:
 
 **Legacy Facebook Login apps** via `DEFAULT_OAUTH_SCOPES`:
 
@@ -108,6 +139,10 @@ The SDK ships with two scope presets:
 - `pages_show_list`
 - `pages_read_engagement`
 
+**Instagram Login** via `DEFAULT_INSTAGRAM_LOGIN_SCOPES`:
+
+- `instagram_business_basic`
+
 Override scopes per authorization request when needed. See [docs/API_ALIGNMENT.md](./docs/API_ALIGNMENT.md) for the full mapping to Meta documentation.
 
 ## Architecture
@@ -116,6 +151,7 @@ Override scopes per authorization request when needed. See [docs/API_ALIGNMENT.m
 InstagramClient
 ├── users      → profile, media listing, business discovery
 ├── media      → media lookup, comments, publishing, resumable uploads
+├── hashtags   → hashtag search, recent media, top media
 ├── insights   → account and media analytics
 ├── commerce   → catalogs, product search, product tags
 ├── messaging  → direct messages and private replies
@@ -152,6 +188,24 @@ await client.media.publishWhenReady('container-id', { enforceQuota: true });
 await client.media.getContentPublishingLimit();
 await client.media.setCommentHidden('comment-id', true);
 ```
+
+### Hashtags
+
+```ts
+const search = await client.hashtags.search('coke');
+const hashtagId = search.data[0]?.id;
+
+if (hashtagId) {
+  await client.hashtags.getById(hashtagId);
+  await client.hashtags.listRecentMedia(hashtagId, {
+    fields: ['id', 'media_type', 'comments_count', 'like_count'],
+    limit: 25,
+  });
+  await client.hashtags.listTopMedia(hashtagId);
+}
+```
+
+Hashtag media endpoints require Meta's Instagram Public Content Access feature.
 
 ### Webhook verification
 

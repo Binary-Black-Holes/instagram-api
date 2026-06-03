@@ -28,23 +28,35 @@ Comprehensive reference for AI agents integrating, extending, or debugging this 
 
 ### Token types
 
-| Token | Source | Used by | Lifetime |
-| --- | --- | --- | --- |
-| **Authorization code** | OAuth redirect | `exchangeCodeForToken()` | Single use |
-| **Short-lived user token** | Code exchange | `exchangeForLongLivedToken()`, `listConnectedAccounts()` | ~1 hour |
-| **Long-lived user token** | Token exchange | Account discovery, refresh | ~60 days |
-| **Page access token** | `listConnectedAccounts()` → `access_token` on Page | **`InstagramClient`** | Tied to Page; refresh via user token flow |
+| Token                               | Source                                             | Used by                                                  | Lifetime                                  |
+| ----------------------------------- | -------------------------------------------------- | -------------------------------------------------------- | ----------------------------------------- |
+| **Authorization code**              | OAuth redirect                                     | `exchangeCodeForToken()`                                 | Single use                                |
+| **Facebook short-lived user token** | Facebook Login code exchange                       | `exchangeForLongLivedToken()`, `listConnectedAccounts()` | ~1 hour                                   |
+| **Facebook long-lived user token**  | Facebook token exchange                            | Account discovery, refresh                               | ~60 days                                  |
+| **Page access token**               | `listConnectedAccounts()` → `access_token` on Page | `InstagramClient` with `loginType: 'facebook'`           | Tied to Page; refresh via user token flow |
+| **Instagram User access token**     | Instagram Login code exchange/token exchange       | `InstagramClient` with `loginType: 'instagram'`          | Short-lived or ~60 days                   |
 
-### Required OAuth flow (always in this order)
+### Facebook Login flow
 
 ```text
-1. OAuthProvider.getAuthorizationUrl({ state })
+1. new OAuthProvider({ loginType: 'facebook', ... })   [loginType optional; default]
+2. OAuthProvider.getAuthorizationUrl({ state })
+3. User authorizes → redirect with ?code=
+4. OAuthProvider.exchangeCodeForToken(code)
+5. OAuthProvider.exchangeForLongLivedToken(shortLivedToken)   [recommended]
+6. OAuthProvider.listConnectedAccounts(longLivedUserToken)
+7. Extract page.access_token + page.instagram_business_account.id
+8. new InstagramClient({ accessToken: pageToken, instagramAccountId })
+```
+
+### Instagram Login flow
+
+```text
+1. new OAuthProvider({ loginType: 'instagram', ... })
 2. User authorizes → redirect with ?code=
 3. OAuthProvider.exchangeCodeForToken(code)
-4. OAuthProvider.exchangeForLongLivedToken(shortLivedToken)   [recommended]
-5. OAuthProvider.listConnectedAccounts(longLivedUserToken)
-6. Extract page.access_token + page.instagram_business_account.id
-7. new InstagramClient({ accessToken, instagramAccountId })
+4. OAuthProvider.exchangeForLongLivedToken(shortLivedInstagramToken)
+5. new InstagramClient({ loginType: 'instagram', accessToken })
 ```
 
 ### OAuth scopes
@@ -67,6 +79,10 @@ Comprehensive reference for AI agents integrating, extending, or debugging this 
 - `pages_show_list`
 - `pages_read_engagement`
 
+**Instagram Login** (`DEFAULT_INSTAGRAM_LOGIN_SCOPES`):
+
+- `instagram_business_basic`
+
 **Additional scopes** (pass explicitly when needed):
 
 - Messaging: `instagram_manage_messages` or `instagram_business_manage_messages`
@@ -76,7 +92,7 @@ Override per request:
 
 ```ts
 oauth.getAuthorizationUrl({
-  scopes: ['instagram_business_basic', 'pages_show_list'],
+  scopes: ["instagram_business_basic", "pages_show_list"],
 });
 ```
 
@@ -86,6 +102,8 @@ oauth.getAuthorizationUrl({
 const refreshed = await oauth.refreshLongLivedToken(existingLongLivedToken);
 client.setAccessToken(newPageToken); // after re-fetching Page token if needed
 ```
+
+With `loginType: 'facebook'`, refresh uses Facebook Login token exchange on `graph.facebook.com`. With `loginType: 'instagram'`, refresh uses Meta's Instagram Login `GET https://graph.instagram.com/refresh_access_token` endpoint.
 
 ### Token introspection
 
@@ -100,14 +118,15 @@ const info = await oauth.debugToken(inputToken, appOrUserToken);
 
 ```ts
 interface InstagramClientConfig {
-  accessToken: string;           // REQUIRED — Page access token
-  instagramAccountId: string;      // REQUIRED — IG Business/Creator user ID
-  apiVersion?: GraphApiVersion;    // default 'v21.0'; v19.0–v25.0 typed
-  timeoutMs?: number;              // default 30000
-  retry?: Partial<RetryPolicy>;    // default maxRetries: 2, baseDelayMs: 500
-  axios?: AxiosInstance;           // custom instance for interceptors/testing
-  logger?: Logger;                 // debug/info/warn/error
-  hooks?: HttpClientHooks;         // onRequest, onResponse, onError
+  loginType?: "facebook" | "instagram"; // default 'facebook'
+  accessToken: string; // Page token for Facebook Login; Instagram User token for Instagram Login
+  instagramAccountId?: string; // REQUIRED for Facebook Login; optional for Instagram Login (/me)
+  apiVersion?: GraphApiVersion; // default 'v21.0'; v19.0–v25.0 typed
+  timeoutMs?: number; // default 30000
+  retry?: Partial<RetryPolicy>; // default maxRetries: 2, baseDelayMs: 500
+  axios?: AxiosInstance; // custom instance for interceptors/testing
+  logger?: Logger; // debug/info/warn/error
+  hooks?: HttpClientHooks; // onRequest, onResponse, onError
 }
 ```
 
@@ -138,19 +157,19 @@ Retries honor `Retry-After` header when present (surfaced on `RateLimitError.ret
 
 ### `client.users` — UsersResource
 
-| Method | Graph API | Returns | Notes |
-| --- | --- | --- | --- |
-| `getProfile(options?)` | `GET /{ig-user-id}?fields=...` | `InstagramUser` | Default fields: id, username, name, biography, website, followers_count, follows_count, media_count, profile_picture_url |
-| `listMedia(options?)` | `GET /{ig-user-id}/media` | `UserMediaResponse` | Paginated; supports limit, after, before, fields |
-| `listAllMedia(options?)` | Paginated helper | `InstagramMedia[]` | Auto-follows cursors |
-| `discoverBusiness(options)` | `GET /{ig-user-id}?fields=business_discovery.username(...){...}` | `BusinessDiscoveryResponse` | Requires `username`; competitor analytics |
+| Method                      | Graph API                                                        | Returns                     | Notes                                                                                                                    |
+| --------------------------- | ---------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `getProfile(options?)`      | `GET /{ig-user-id}?fields=...`                                   | `InstagramUser`             | Default fields: id, username, name, biography, website, followers_count, follows_count, media_count, profile_picture_url |
+| `listMedia(options?)`       | `GET /{ig-user-id}/media`                                        | `UserMediaResponse`         | Paginated; supports limit, after, before, fields                                                                         |
+| `listAllMedia(options?)`    | Paginated helper                                                 | `InstagramMedia[]`          | Auto-follows cursors                                                                                                     |
+| `discoverBusiness(options)` | `GET /{ig-user-id}?fields=business_discovery.username(...){...}` | `BusinessDiscoveryResponse` | Requires `username`; competitor analytics                                                                                |
 
 **Example — business discovery:**
 
 ```ts
 const result = await client.users.discoverBusiness({
-  username: 'competitor',
-  fields: ['username', 'followers_count', 'media_count'],
+  username: "competitor",
+  fields: ["username", "followers_count", "media_count"],
 });
 const business = result.business_discovery;
 ```
@@ -159,27 +178,27 @@ const business = result.business_discovery;
 
 ### `client.media` — MediaResource
 
-| Method | Graph API | Returns |
-| --- | --- | --- |
-| `getById(mediaId, options?)` | `GET /{ig-media-id}` | `InstagramMedia` |
-| `listComments(mediaId, options?)` | `GET /{ig-media-id}/comments` | `PaginatedResponse<InstagramComment>` |
-| `listAllComments(mediaId, options?)` | Paginated helper | `InstagramComment[]` |
-| `createImageContainer(input)` | `POST /{ig-user-id}/media` | `MediaContainerResponse` |
-| `createStoryContainer(input)` | `POST /{ig-user-id}/media` | `MediaContainerResponse` |
-| `createVideoContainer(input)` | `POST /{ig-user-id}/media` | `MediaContainerResponse` |
-| `createCarouselItemContainer(input)` | `POST /{ig-user-id}/media` | `MediaContainerResponse` |
-| `createCarouselContainer(input)` | `POST /{ig-user-id}/media` | `MediaContainerResponse` |
-| `createResumableUploadSession(input)` | `POST /{ig-user-id}/media` | `ResumableUploadSessionResponse` |
-| `uploadResumableVideo(input)` | `POST rupload.facebook.com/...` | `{ success?, message? }` |
-| `getContainerStatus(containerId)` | `GET /{ig-container-id}?fields=status_code` | `MediaContainerStatus` |
-| `waitForContainerReady(containerId, options?)` | Poll status | `MediaContainerStatus` |
-| `publish(containerId)` | `POST /{ig-user-id}/media_publish` | `PublishMediaResponse` |
-| `publishWhenReady(containerId, options?)` | Quota + poll + publish | `PublishMediaResponse` |
-| `assertPublishingQuotaAvailable()` | `GET /{ig-user-id}/content_publishing_limit` | `PublishingQuotaSummary` |
-| `getContentPublishingLimit(options?)` | `GET /{ig-user-id}/content_publishing_limit` | `ContentPublishingLimitResponse` |
-| `replyToComment(commentId, input)` | `POST /{ig-comment-id}/replies` | `CommentReplyResponse` |
-| `deleteComment(commentId)` | `DELETE /{ig-comment-id}` | `{ success: boolean }` |
-| `setCommentHidden(commentId, hidden)` | `POST /{ig-comment-id}?hide=` | `{ success: boolean }` |
+| Method                                         | Graph API                                    | Returns                               |
+| ---------------------------------------------- | -------------------------------------------- | ------------------------------------- |
+| `getById(mediaId, options?)`                   | `GET /{ig-media-id}`                         | `InstagramMedia`                      |
+| `listComments(mediaId, options?)`              | `GET /{ig-media-id}/comments`                | `PaginatedResponse<InstagramComment>` |
+| `listAllComments(mediaId, options?)`           | Paginated helper                             | `InstagramComment[]`                  |
+| `createImageContainer(input)`                  | `POST /{ig-user-id}/media`                   | `MediaContainerResponse`              |
+| `createStoryContainer(input)`                  | `POST /{ig-user-id}/media`                   | `MediaContainerResponse`              |
+| `createVideoContainer(input)`                  | `POST /{ig-user-id}/media`                   | `MediaContainerResponse`              |
+| `createCarouselItemContainer(input)`           | `POST /{ig-user-id}/media`                   | `MediaContainerResponse`              |
+| `createCarouselContainer(input)`               | `POST /{ig-user-id}/media`                   | `MediaContainerResponse`              |
+| `createResumableUploadSession(input)`          | `POST /{ig-user-id}/media`                   | `ResumableUploadSessionResponse`      |
+| `uploadResumableVideo(input)`                  | `POST rupload.facebook.com/...`              | `{ success?, message? }`              |
+| `getContainerStatus(containerId)`              | `GET /{ig-container-id}?fields=status_code`  | `MediaContainerStatus`                |
+| `waitForContainerReady(containerId, options?)` | Poll status                                  | `MediaContainerStatus`                |
+| `publish(containerId)`                         | `POST /{ig-user-id}/media_publish`           | `PublishMediaResponse`                |
+| `publishWhenReady(containerId, options?)`      | Quota + poll + publish                       | `PublishMediaResponse`                |
+| `assertPublishingQuotaAvailable()`             | `GET /{ig-user-id}/content_publishing_limit` | `PublishingQuotaSummary`              |
+| `getContentPublishingLimit(options?)`          | `GET /{ig-user-id}/content_publishing_limit` | `ContentPublishingLimitResponse`      |
+| `replyToComment(commentId, input)`             | `POST /{ig-comment-id}/replies`              | `CommentReplyResponse`                |
+| `deleteComment(commentId)`                     | `DELETE /{ig-comment-id}`                    | `{ success: boolean }`                |
+| `setCommentHidden(commentId, hidden)`          | `POST /{ig-comment-id}?hide=`                | `{ success: boolean }`                |
 
 **Container input shapes:**
 
@@ -247,11 +266,38 @@ uploadResumableVideo({
 
 ---
 
+### `client.hashtags` — HashtagsResource
+
+| Method                                 | Graph API                                           | Returns                 | Notes                                           |
+| -------------------------------------- | --------------------------------------------------- | ----------------------- | ----------------------------------------------- |
+| `search(hashtag)`                      | `GET /ig_hashtag_search?user_id={ig-user-id}&q=...` | `HashtagSearchResponse` | Accepts `tag` or `#tag`; returns IG Hashtag IDs |
+| `getById(hashtagId, options?)`         | `GET /{ig-hashtag-id}?fields=...`                   | `InstagramHashtag`      | Default fields: id, name                        |
+| `listRecentMedia(hashtagId, options?)` | `GET /{ig-hashtag-id}/recent_media`                 | `HashtagMediaResponse`  | Sends required `user_id`; paginated             |
+| `listTopMedia(hashtagId, options?)`    | `GET /{ig-hashtag-id}/top_media`                    | `HashtagMediaResponse`  | Sends required `user_id`; paginated             |
+
+Hashtag media endpoints require Instagram Public Content Access and are subject to Meta's public content limitations, including the 30 unique hashtags per 7 days cap.
+
+**Example — hashtag lookup and media:**
+
+```ts
+const result = await client.hashtags.search("coke");
+const hashtagId = result.data[0]?.id;
+
+if (hashtagId) {
+  const recent = await client.hashtags.listRecentMedia(hashtagId, {
+    fields: ["id", "media_type", "comments_count", "like_count"],
+    limit: 25,
+  });
+}
+```
+
+---
+
 ### `client.insights` — InsightsResource
 
-| Method | Graph API | Required options |
-| --- | --- | --- |
-| `getUserInsights(options)` | `GET /{ig-user-id}/insights` | `metrics: UserInsightMetric[]` |
+| Method                               | Graph API                     | Required options                |
+| ------------------------------------ | ----------------------------- | ------------------------------- |
+| `getUserInsights(options)`           | `GET /{ig-user-id}/insights`  | `metrics: UserInsightMetric[]`  |
 | `getMediaInsights(mediaId, options)` | `GET /{ig-media-id}/insights` | `metrics: MediaInsightMetric[]` |
 
 **User insight options:**
@@ -278,22 +324,22 @@ uploadResumableVideo({
 
 ### `client.commerce` — CommerceResource
 
-| Method | Graph API | Notes |
-| --- | --- | --- |
-| `listAvailableCatalogs()` | `GET /{ig-user-id}?fields=available_catalogs` | |
-| `searchCatalogProducts(options)` | `GET /{ig-user-id}/catalog_product_search` | Requires `catalogId` |
-| `listProductTags(mediaId)` | `GET /{ig-media-id}/product_tags` | |
-| `updateProductTags(mediaId, tags)` | `POST /{ig-media-id}/product_tags` | `updated_tags` serialized |
+| Method                             | Graph API                                     | Notes                     |
+| ---------------------------------- | --------------------------------------------- | ------------------------- |
+| `listAvailableCatalogs()`          | `GET /{ig-user-id}?fields=available_catalogs` |                           |
+| `searchCatalogProducts(options)`   | `GET /{ig-user-id}/catalog_product_search`    | Requires `catalogId`      |
+| `listProductTags(mediaId)`         | `GET /{ig-media-id}/product_tags`             |                           |
+| `updateProductTags(mediaId, tags)` | `POST /{ig-media-id}/product_tags`            | `updated_tags` serialized |
 
 ---
 
 ### `client.messaging` — MessagingResource
 
-| Method | Graph API | Input |
-| --- | --- | --- |
-| `sendTextMessage(input)` | `POST /{ig-user-id}/messages` | `{ recipientId, text }` |
-| `sendMediaShare(input)` | `POST /{ig-user-id}/messages` | `{ recipientId, mediaId }` |
-| `sendPrivateReply(input)` | `POST /{ig-user-id}/messages` | `{ commentId, text }` |
+| Method                    | Graph API                     | Input                      |
+| ------------------------- | ----------------------------- | -------------------------- |
+| `sendTextMessage(input)`  | `POST /{ig-user-id}/messages` | `{ recipientId, text }`    |
+| `sendMediaShare(input)`   | `POST /{ig-user-id}/messages` | `{ recipientId, mediaId }` |
+| `sendPrivateReply(input)` | `POST /{ig-user-id}/messages` | `{ commentId, text }`      |
 
 All messaging methods send JSON body: `{ recipient, message }`.
 
@@ -307,15 +353,15 @@ All messaging methods send JSON body: `{ recipient, message }`.
 
 Graph API subscription management (not HTTP route hosting):
 
-| Method | Graph API |
-| --- | --- |
-| `subscribe(options)` | `POST /{ig-user-id}/subscribed_apps?subscribed_fields=...` |
-| `unsubscribe()` | `DELETE /{ig-user-id}/subscribed_apps` |
-| `listSubscriptions()` | `GET /{ig-user-id}/subscribed_apps` |
+| Method                | Graph API                                                  |
+| --------------------- | ---------------------------------------------------------- |
+| `subscribe(options)`  | `POST /{ig-user-id}/subscribed_apps?subscribed_fields=...` |
+| `unsubscribe()`       | `DELETE /{ig-user-id}/subscribed_apps`                     |
+| `listSubscriptions()` | `GET /{ig-user-id}/subscribed_apps`                        |
 
 ```ts
 await client.webhooks.subscribe({
-  fields: ['comments', 'messages', 'mentions'], // WebhookField[]
+  fields: ["comments", "messages", "mentions"], // WebhookField[]
 });
 ```
 
@@ -323,15 +369,15 @@ await client.webhooks.subscribe({
 
 ## 4. OAuthProvider method catalog
 
-| Method | Purpose |
-| --- | --- |
-| `getAuthorizationUrl(options?)` | Build Facebook OAuth dialog URL |
-| `exchangeCodeForToken(code)` | Short-lived user token |
-| `exchangeForLongLivedToken(shortLivedToken)` | ~60 day user token |
-| `refreshLongLivedToken(longLivedToken)` | Refresh before expiry |
-| `debugToken(inputToken, accessToken)` | Token metadata |
-| `listConnectedAccounts(userAccessToken, options?)` | `GET /me/accounts` with IG account fields |
-| `getAxiosInstance()` | Underlying Axios for testing |
+| Method                                             | Purpose                                                        |
+| -------------------------------------------------- | -------------------------------------------------------------- |
+| `getAuthorizationUrl(options?)`                    | Build Facebook or Instagram OAuth dialog URL                   |
+| `exchangeCodeForToken(code)`                       | Short-lived user token for selected login product              |
+| `exchangeForLongLivedToken(shortLivedToken)`       | ~60 day user token for selected login product                  |
+| `refreshLongLivedToken(longLivedToken)`            | Refresh long-lived user token before expiry                    |
+| `debugToken(inputToken, accessToken)`              | Token metadata                                                 |
+| `listConnectedAccounts(userAccessToken, options?)` | Facebook Login only: `GET /me/accounts` with IG account fields |
+| `getAxiosInstance()`                               | Underlying Axios for testing                                   |
 
 **listConnectedAccounts default fields:** `id`, `name`, `access_token`, `instagram_business_account`
 
@@ -355,11 +401,14 @@ Standalone functions — no `InstagramClient` required.
 ### Verification handshake (GET)
 
 ```ts
-import { verifyWebhookChallenge } from '@binary-black-holes/instagram-api';
+import { verifyWebhookChallenge } from "@binary-black-holes/instagram-api";
 
 // Express example
-app.get('/webhooks/instagram', (req, res) => {
-  const challenge = verifyWebhookChallenge(req.query, process.env.WEBHOOK_VERIFY_TOKEN!);
+app.get("/webhooks/instagram", (req, res) => {
+  const challenge = verifyWebhookChallenge(
+    req.query,
+    process.env.WEBHOOK_VERIFY_TOKEN!,
+  );
   res.status(200).send(challenge);
 });
 ```
@@ -373,16 +422,20 @@ Query shape (`WebhookChallengeQuery`):
 ### Event delivery (POST)
 
 ```ts
-import { parseVerifiedWebhookPayload } from '@binary-black-holes/instagram-api';
+import { parseVerifiedWebhookPayload } from "@binary-black-holes/instagram-api";
 
-app.post('/webhooks/instagram', express.raw({ type: 'application/json' }), (req, res) => {
-  const payload = parseVerifiedWebhookPayload(req.body, {
-    signatureHeader: req.headers['x-hub-signature-256'] as string,
-    appSecret: process.env.META_APP_SECRET!,
-  });
-  // payload.object, payload.entry[]
-  res.sendStatus(200);
-});
+app.post(
+  "/webhooks/instagram",
+  express.raw({ type: "application/json" }),
+  (req, res) => {
+    const payload = parseVerifiedWebhookPayload(req.body, {
+      signatureHeader: req.headers["x-hub-signature-256"] as string,
+      appSecret: process.env.META_APP_SECRET!,
+    });
+    // payload.object, payload.entry[]
+    res.sendStatus(200);
+  },
+);
 ```
 
 **Critical:** use raw body bytes for signature verification, not parsed JSON.
@@ -391,7 +444,7 @@ app.post('/webhooks/instagram', express.raw({ type: 'application/json' }), (req,
 
 ```ts
 verifyWebhookSignature(rawBody, signatureHeader, appSecret); // boolean
-parseWebhookPayload(jsonString);                              // no verification
+parseWebhookPayload(jsonString); // no verification
 ```
 
 ---
@@ -402,9 +455,9 @@ parseWebhookPayload(jsonString);                              // no verification
 
 ```ts
 const { id: containerId } = await client.media.createImageContainer({
-  imageUrl: 'https://cdn.example.com/photo.jpg',
-  caption: 'Hello world',
-  altText: 'Description for accessibility',
+  imageUrl: "https://cdn.example.com/photo.jpg",
+  caption: "Hello world",
+  altText: "Description for accessibility",
 });
 const { id: mediaId } = await client.media.publishWhenReady(containerId, {
   enforceQuota: true,
@@ -415,9 +468,9 @@ const { id: mediaId } = await client.media.publishWhenReady(containerId, {
 
 ```ts
 const { id: containerId } = await client.media.createVideoContainer({
-  videoUrl: 'https://cdn.example.com/reel.mp4',
-  mediaType: 'REELS',
-  caption: 'New reel',
+  videoUrl: "https://cdn.example.com/reel.mp4",
+  mediaType: "REELS",
+  caption: "New reel",
   shareToFeed: true,
 });
 await client.media.publishWhenReady(containerId);
@@ -427,12 +480,16 @@ await client.media.publishWhenReady(containerId);
 
 ```ts
 const items = await Promise.all([
-  client.media.createCarouselItemContainer({ imageUrl: 'https://cdn.example.com/1.jpg' }),
-  client.media.createCarouselItemContainer({ imageUrl: 'https://cdn.example.com/2.jpg' }),
+  client.media.createCarouselItemContainer({
+    imageUrl: "https://cdn.example.com/1.jpg",
+  }),
+  client.media.createCarouselItemContainer({
+    imageUrl: "https://cdn.example.com/2.jpg",
+  }),
 ]);
 const { id: carouselId } = await client.media.createCarouselContainer({
   children: items.map((i) => i.id),
-  caption: 'Swipe through',
+  caption: "Swipe through",
 });
 await client.media.publishWhenReady(carouselId, { enforceQuota: true });
 ```
@@ -440,10 +497,10 @@ await client.media.publishWhenReady(carouselId, { enforceQuota: true });
 ### Resumable upload (large local file)
 
 ```ts
-const file = await readFile('video.mp4');
+const file = await readFile("video.mp4");
 const { id: containerId } = await client.media.createResumableUploadSession({
-  mediaType: 'REELS',
-  caption: 'Uploaded locally',
+  mediaType: "REELS",
+  caption: "Uploaded locally",
 });
 await client.media.uploadResumableVideo({
   containerId,
@@ -486,7 +543,9 @@ interface PaginatedResponse<T> {
 let after: string | undefined;
 do {
   const page = await client.users.listMedia({ limit: 25, after });
-  for (const item of page.data) { /* ... */ }
+  for (const item of page.data) {
+    /* ... */
+  }
   after = page.paging?.cursors?.after;
 } while (after && page.paging?.next);
 ```
@@ -494,9 +553,14 @@ do {
 ### Async iteration
 
 ```ts
-import { iteratePages, collectAllPages } from '@binary-black-holes/instagram-api';
+import {
+  iteratePages,
+  collectAllPages,
+} from "@binary-black-holes/instagram-api";
 
-for await (const media of iteratePages((opts) => client.users.listMedia(opts))) {
+for await (const media of iteratePages((opts) =>
+  client.users.listMedia(opts),
+)) {
   console.log(media.id);
 }
 
@@ -529,7 +593,7 @@ import {
   RateLimitError,
   ValidationError,
   NotFoundError,
-} from '@binary-black-holes/instagram-api';
+} from "@binary-black-holes/instagram-api";
 
 try {
   await client.users.getProfile();
@@ -552,11 +616,11 @@ try {
 ### Error metadata
 
 ```ts
-error.code;       // Meta Graph API error code
-error.subcode;    // error_subcode
-error.type;       // Meta error type
-error.status;     // HTTP status
-error.traceId;    // fbtrace_id for Meta support
+error.code; // Meta Graph API error code
+error.subcode; // error_subcode
+error.type; // Meta error type
+error.status; // HTTP status
+error.traceId; // fbtrace_id for Meta support
 error.graphError; // full GraphApiErrorBody
 ```
 
@@ -577,17 +641,17 @@ All types export from the package root. Source of truth: `src/index.ts`.
 
 ### Domain types
 
-| File | Key types |
-| --- | --- |
-| `types/user.ts` | `InstagramUser`, `InstagramUserField`, `ListUserMediaOptions` |
-| `types/media.ts` | `InstagramMedia`, `CreateImageMediaInput`, `MediaContainerStatus`, publishing inputs |
-| `types/insights.ts` | `UserInsightMetric`, `MediaInsightMetric`, `InsightsResponse` |
-| `types/commerce.ts` | `InstagramCatalog`, `ProductTag`, `CatalogProductSearchOptions` |
-| `types/messaging.ts` | `SendTextMessageInput`, `SendPrivateReplyInput` |
-| `types/webhooks.ts` | `WebhookField`, `InstagramWebhookPayload`, `WebhookChallengeQuery` |
-| `types/discovery.ts` | `BusinessDiscoveryOptions`, `DiscoveredBusiness` |
-| `types/account.ts` | `ConnectedFacebookPage`, `ContentPublishingLimit` |
-| `types/common.ts` | `PaginatedResponse`, `GraphApiVersion`, OAuth constants |
+| File                 | Key types                                                                            |
+| -------------------- | ------------------------------------------------------------------------------------ |
+| `types/user.ts`      | `InstagramUser`, `InstagramUserField`, `ListUserMediaOptions`                        |
+| `types/media.ts`     | `InstagramMedia`, `CreateImageMediaInput`, `MediaContainerStatus`, publishing inputs |
+| `types/insights.ts`  | `UserInsightMetric`, `MediaInsightMetric`, `InsightsResponse`                        |
+| `types/commerce.ts`  | `InstagramCatalog`, `ProductTag`, `CatalogProductSearchOptions`                      |
+| `types/messaging.ts` | `SendTextMessageInput`, `SendPrivateReplyInput`                                      |
+| `types/webhooks.ts`  | `WebhookField`, `InstagramWebhookPayload`, `WebhookChallengeQuery`                   |
+| `types/discovery.ts` | `BusinessDiscoveryOptions`, `DiscoveredBusiness`                                     |
+| `types/account.ts`   | `ConnectedFacebookPage`, `ContentPublishingLimit`                                    |
+| `types/common.ts`    | `PaginatedResponse`, `GraphApiVersion`, OAuth constants                              |
 
 ### GraphApiVersion
 
@@ -599,20 +663,20 @@ Default: `'v21.0'`
 
 ## 10. Utility functions
 
-| Function | Purpose |
-| --- | --- |
-| `iteratePages(fetchPage, options?)` | Async generator over paginated results |
-| `collectAllPages(fetchPage, options?)` | Flatten all pages to array |
-| `resolveFields(requested, defaults)` | Merge field arrays for Graph API `fields` param |
-| `buildQueryString(params)` | URL-encode query parameters |
-| `joinUrl(...segments)` | Join URL path segments |
-| `parseRetryAfterMs(header)` | Parse Retry-After header value |
-| `sleep(ms)` | Promise-based delay |
-| `pickDefined(obj)` | Strip undefined keys from objects |
-| `buildBusinessDiscoveryFields(username, fields)` | Build business_discovery field string |
-| `serializeCarouselChildren(ids)` | Comma-join carousel child IDs |
-| `serializeProductTags(tags)` | JSON-serialize product tags for API |
-| `extractPublishingQuota(response)` | Parse quota usage/remaining from limit response |
+| Function                                         | Purpose                                         |
+| ------------------------------------------------ | ----------------------------------------------- |
+| `iteratePages(fetchPage, options?)`              | Async generator over paginated results          |
+| `collectAllPages(fetchPage, options?)`           | Flatten all pages to array                      |
+| `resolveFields(requested, defaults)`             | Merge field arrays for Graph API `fields` param |
+| `buildQueryString(params)`                       | URL-encode query parameters                     |
+| `joinUrl(...segments)`                           | Join URL path segments                          |
+| `parseRetryAfterMs(header)`                      | Parse Retry-After header value                  |
+| `sleep(ms)`                                      | Promise-based delay                             |
+| `pickDefined(obj)`                               | Strip undefined keys from objects               |
+| `buildBusinessDiscoveryFields(username, fields)` | Build business_discovery field string           |
+| `serializeCarouselChildren(ids)`                 | Comma-join carousel child IDs                   |
+| `serializeProductTags(tags)`                     | JSON-serialize product tags for API             |
+| `extractPublishingQuota(response)`               | Parse quota usage/remaining from limit response |
 
 ---
 
@@ -649,9 +713,9 @@ hooks: {
 ```ts
 const http = client.getHttpClient();
 const { data } = await http.request<MyType>({
-  path: '/experimental-endpoint',
-  method: 'GET',
-  params: { fields: 'id,name' },
+  path: "/experimental-endpoint",
+  method: "GET",
+  params: { fields: "id,name" },
 });
 ```
 
@@ -684,7 +748,9 @@ export class ExampleResource extends BaseResource {
     const accountId = this.resolveAccountId(); // supports per-request override if added
     const response = await this.http.request<Thing>({
       path: `/${accountId}/things`,
-      params: { /* ... */ },
+      params: {
+        /* ... */
+      },
     });
     return response.data;
   }
@@ -704,29 +770,31 @@ export class ExampleResource extends BaseResource {
 ### Standard test setup
 
 ```ts
-import { describe, expect, it } from 'vitest';
-import { HttpClient } from '../http/HttpClient.js';
-import { MediaResource } from '../resources/MediaResource.js';
-import { createMockAxios } from '../test/mockAxios.js';
+import { describe, expect, it } from "vitest";
+import { HttpClient } from "../http/HttpClient.js";
+import { MediaResource } from "../resources/MediaResource.js";
+import { createMockAxios } from "../test/mockAxios.js";
 
-const ACCOUNT_ID = '17841405309211844';
+const ACCOUNT_ID = "17841405309211844";
 
 function createResource() {
   const mock = createMockAxios();
   const http = new HttpClient({
-    accessToken: 'page-token',
-    apiVersion: 'v21.0',
+    accessToken: "page-token",
+    apiVersion: "v21.0",
     axios: mock.axios,
     retry: { maxRetries: 0, baseDelayMs: 0, retryableStatusCodes: [] },
   });
   return { resource: new MediaResource(http, ACCOUNT_ID), mock };
 }
 
-it('example', async () => {
+it("example", async () => {
   const { resource, mock } = createResource();
-  mock.setResponseFor('/media', { status: 200, data: { id: '123' } });
-  const result = await resource.createImageContainer({ imageUrl: 'https://example.com/a.jpg' });
-  expect(result.id).toBe('123');
+  mock.setResponseFor("/media", { status: 200, data: { id: "123" } });
+  const result = await resource.createImageContainer({
+    imageUrl: "https://example.com/a.jpg",
+  });
+  expect(result.id).toBe("123");
 });
 ```
 
@@ -745,17 +813,17 @@ Set `intervalMs: 0` on `waitForContainerReady` to avoid timer delays.
 
 ## 14. Meta platform pitfalls
 
-| Symptom | Likely cause | Fix |
-| --- | --- | --- |
-| `(#190) Invalid OAuth access token` | User token instead of Page token | `listConnectedAccounts()` → use Page `access_token` |
-| `(#100) Unsupported get request` | Wrong ID type or missing permission | Verify IG account ID and App Review scopes |
-| `(#10) Application does not have permission` | Missing scope or App Review | Add scope to OAuth; submit for review |
-| Publishing `ERROR` status | Media URL not publicly accessible | Ensure HTTPS URL reachable by Meta servers |
-| Insight metric error | Deprecated or wrong media type | Use `views`; check metric availability per product type |
-| Webhook signature mismatch | Parsed JSON body used for HMAC | Use raw body buffer/string |
-| Rate limit 429 | Too many requests | Use `error.retryAfterMs`; reduce concurrency |
-| Empty `listConnectedAccounts` | No Page linked to IG account | User must connect IG Business account to Facebook Page |
-| Messaging fails | Outside 24h window or missing permission | Check policy + `instagram_manage_messages` scope |
+| Symptom                                      | Likely cause                             | Fix                                                     |
+| -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
+| `(#190) Invalid OAuth access token`          | User token instead of Page token         | `listConnectedAccounts()` → use Page `access_token`     |
+| `(#100) Unsupported get request`             | Wrong ID type or missing permission      | Verify IG account ID and App Review scopes              |
+| `(#10) Application does not have permission` | Missing scope or App Review              | Add scope to OAuth; submit for review                   |
+| Publishing `ERROR` status                    | Media URL not publicly accessible        | Ensure HTTPS URL reachable by Meta servers              |
+| Insight metric error                         | Deprecated or wrong media type           | Use `views`; check metric availability per product type |
+| Webhook signature mismatch                   | Parsed JSON body used for HMAC           | Use raw body buffer/string                              |
+| Rate limit 429                               | Too many requests                        | Use `error.retryAfterMs`; reduce concurrency            |
+| Empty `listConnectedAccounts`                | No Page linked to IG account             | User must connect IG Business account to Facebook Page  |
+| Messaging fails                              | Outside 24h window or missing permission | Check policy + `instagram_manage_messages` scope        |
 
 ---
 
@@ -764,8 +832,12 @@ Set `intervalMs: 0` on `waitForContainerReady` to avoid timer delays.
 - [Instagram Platform overview](https://developers.facebook.com/docs/instagram-platform)
 - [Instagram API with Facebook Login](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/overview)
 - [Business login for Instagram](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-facebook-login/business-login-for-instagram)
+- [Instagram API with Instagram Login](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/business-login)
+- [Instagram Login OAuth authorize](https://developers.facebook.com/docs/instagram-platform/reference/oauth-authorize)
+- [Instagram Login refresh access token](https://developers.facebook.com/docs/instagram-platform/reference/refresh_access_token)
 - [Content publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing)
 - [Resumable uploads](https://developers.facebook.com/docs/instagram-platform/content-publishing/resumable-uploads)
+- [IG Hashtag reference](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-hashtag)
 - [IG User reference](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user)
 - [IG Media insights](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-media/insights)
 - [Webhooks](https://developers.facebook.com/docs/instagram-platform/webhooks)
@@ -777,7 +849,7 @@ Set `intervalMs: 0` on `waitForContainerReady` to avoid timer delays.
 
 ## Version and semver
 
-- Package version: `0.1.0`
+- Package version: `0.2.0`
 - Exported constant: `VERSION`
 - Follow semver: MAJOR = breaking public API, MINOR = backward-compatible features, PATCH = fixes
 - Update `CHANGELOG.md` on releases

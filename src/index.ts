@@ -22,6 +22,7 @@ export {
   BaseResource,
   UsersResource,
   MediaResource,
+  HashtagsResource,
   InsightsResource,
   CommerceResource,
   MessagingResource,
@@ -37,6 +38,7 @@ export {
 
 export type {
   GraphApiVersion,
+  LoginType,
   PaginatedResponse,
   PaginationCursors,
   PaginationOptions,
@@ -53,6 +55,7 @@ export type {
   OAuthConfig,
   AuthorizationUrlOptions,
   AccessTokenResponse,
+  InstagramLoginAccessTokenResponse,
   LongLivedTokenResponse,
   TokenDebugInfo,
   InstagramUser,
@@ -82,6 +85,12 @@ export type {
   WaitForContainerReadyOptions,
   PublishWhenReadyOptions,
   PublishingQuotaSummary,
+  InstagramHashtag,
+  InstagramHashtagField,
+  GetHashtagOptions,
+  HashtagSearchResponse,
+  HashtagMediaOptions,
+  HashtagMediaResponse,
   ConnectedFacebookPage,
   ConnectedFacebookPageField,
   ListConnectedAccountsOptions,
@@ -137,8 +146,12 @@ export type {
 export {
   DEFAULT_OAUTH_SCOPES,
   DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES,
+  DEFAULT_INSTAGRAM_LOGIN_SCOPES,
   GRAPH_API_BASE_URL,
   OAUTH_DIALOG_URL,
+  INSTAGRAM_GRAPH_API_BASE_URL,
+  INSTAGRAM_OAUTH_DIALOG_URL,
+  INSTAGRAM_OAUTH_API_BASE_URL,
   RUPLOAD_BASE_URL,
 } from './types/index.js';
 
@@ -157,4 +170,4 @@ export {
 export { iteratePages, collectAllPages } from './utils/index.js';
 export type { WithoutUndefined } from './utils/index.js';
 
-export const VERSION = '0.1.1';
+export const VERSION = '0.2.0';

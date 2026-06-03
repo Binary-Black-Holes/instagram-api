@@ -1,4 +1,6 @@
 import type { HttpClient } from '../http/HttpClient.js';
+import { ValidationError } from '../errors/index.js';
+import type { LoginType } from '../types/common.js';
 
 /**
  * Base class for Graph API resource modules.
@@ -33,5 +35,21 @@ export abstract class BaseResource {
    */
   protected resolveAccountId(override?: string): string {
     return override ?? this.accountId;
+  }
+
+  /**
+   * Returns the configured Meta login product for this resource.
+   */
+  protected getLoginType(): LoginType {
+    return this.http.getLoginType();
+  }
+
+  /**
+   * Prevents accidental calls to endpoints Meta documents as Facebook Login-only.
+   */
+  protected assertFacebookLoginOnly(resourceName: string): void {
+    if (this.getLoginType() === 'instagram') {
+      throw new ValidationError(`${resourceName} is only available with Instagram API using Facebook Login.`);
+    }
   }
 }

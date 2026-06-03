@@ -21,6 +21,7 @@ export class CommerceResource extends BaseResource {
    * Graph API: `GET /{ig-user-id}?fields=available_catalogs`
    */
   async listAvailableCatalogs(): Promise<AvailableCatalogsResponse> {
+    this.assertFacebookLoginOnly('Commerce catalog access');
     const accountId = this.resolveAccountId();
     const response = await this.http.request<AvailableCatalogsResponse>({
       path: `/${accountId}`,
@@ -40,6 +41,7 @@ export class CommerceResource extends BaseResource {
   async searchCatalogProducts(
     options: CatalogProductSearchOptions,
   ): Promise<CatalogProductSearchResponse> {
+    this.assertFacebookLoginOnly('Commerce product search');
     if (!options.catalogId.trim()) {
       throw new ValidationError('catalogId must be a non-empty string.');
     }
@@ -65,6 +67,7 @@ export class CommerceResource extends BaseResource {
    * Graph API: `GET /{ig-media-id}/product_tags`
    */
   async listProductTags(mediaId: string): Promise<ProductTagsResponse> {
+    this.assertFacebookLoginOnly('Commerce product tags');
     if (!mediaId.trim()) {
       throw new ValidationError('mediaId must be a non-empty string.');
     }
@@ -82,6 +85,7 @@ export class CommerceResource extends BaseResource {
    * Graph API: `POST /{ig-media-id}/product_tags`
    */
   async updateProductTags(mediaId: string, tags: ProductTagInput[]): Promise<{ success: boolean }> {
+    this.assertFacebookLoginOnly('Commerce product tags');
     if (!mediaId.trim()) {
       throw new ValidationError('mediaId must be a non-empty string.');
     }
