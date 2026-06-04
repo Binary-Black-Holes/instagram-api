@@ -65,13 +65,37 @@ export class OAuthProvider {
   }
 
   /**
-   * Builds the Facebook OAuth dialog URL used to initiate user authorization.
+   * Builds the OAuth dialog URL used to initiate user authorization.
+   *
+   * For Facebook Login this targets `www.facebook.com/{version}/dialog/oauth`.
+   * For Instagram Login this targets `www.instagram.com/oauth/authorize` and
+   * supports the `force_reauth` and `enable_fb_login` parameters.
    *
    * @param options - Authorization URL options.
    * @returns Absolute authorization URL.
    */
   getAuthorizationUrl(options: AuthorizationUrlOptions = {}): string {
     const scopes = options.scopes ?? [...this.scopes];
+
+    if (this.loginType === 'instagram') {
+      const params = buildQueryString({
+        client_id: this.clientId,
+        redirect_uri: this.redirectUri,
+        response_type: 'code',
+        scope: scopes.join(','),
+        state: options.state,
+        force_reauth: options.forceReauth ? 'true' : undefined,
+        enable_fb_login:
+          options.enableFacebookLogin === undefined
+            ? undefined
+            : options.enableFacebookLogin
+              ? 'true'
+              : 'false',
+      });
+
+      return `${joinUrl(INSTAGRAM_OAUTH_DIALOG_URL, 'oauth/authorize')}?${params}`;
+    }
+
     const params = buildQueryString({
       client_id: this.clientId,
       redirect_uri: this.redirectUri,
@@ -81,12 +105,7 @@ export class OAuthProvider {
       auth_type: options.forceReauth ? 'rerequest' : undefined,
     });
 
-    const base =
-      this.loginType === 'instagram'
-        ? joinUrl(INSTAGRAM_OAUTH_DIALOG_URL, 'oauth/authorize')
-        : joinUrl(OAUTH_DIALOG_URL, this.apiVersion, 'dialog/oauth');
-
-    return `${base}?${params}`;
+    return `${joinUrl(OAUTH_DIALOG_URL, this.apiVersion, 'dialog/oauth')}?${params}`;
   }
 
   /**

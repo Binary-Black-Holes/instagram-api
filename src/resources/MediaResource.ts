@@ -470,6 +470,53 @@ export class MediaResource extends BaseResource {
     return response.data;
   }
 
+  /**
+   * Lists replies on a comment.
+   *
+   * Graph API: `GET /{ig-comment-id}/replies`
+   *
+   * @see https://developers.facebook.com/docs/instagram-platform/comment-moderation
+   */
+  async listCommentReplies(
+    commentId: string,
+    options: ListMediaCommentsOptions = {},
+  ): Promise<PaginatedResponse<InstagramComment>> {
+    this.assertNonEmptyId(commentId, 'commentId');
+
+    const response = await this.http.request<PaginatedResponse<InstagramComment>>({
+      path: `/${commentId}/replies`,
+      params: {
+        fields: options.fields?.join(','),
+        limit: options.limit,
+        after: options.after,
+        before: options.before,
+      },
+    });
+
+    return response.data;
+  }
+
+  /**
+   * Enables or disables commenting on a media object.
+   *
+   * Graph API: `POST /{ig-media-id}?comment_enabled={boolean}`
+   *
+   * @see https://developers.facebook.com/docs/instagram-platform/comment-moderation
+   */
+  async setCommentsEnabled(mediaId: string, enabled: boolean): Promise<{ success: boolean }> {
+    this.assertNonEmptyId(mediaId, 'mediaId');
+
+    const response = await this.http.request<{ success: boolean }>({
+      path: `/${mediaId}`,
+      method: 'POST',
+      params: {
+        comment_enabled: enabled,
+      },
+    });
+
+    return response.data;
+  }
+
   private assertNonEmptyId(value: string, fieldName: string): void {
     if (!value.trim()) {
       throw new ValidationError(`${fieldName} must be a non-empty string.`);

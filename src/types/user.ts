@@ -4,15 +4,25 @@ import type { PaginatedResponse, PaginationOptions } from './common.js';
  * Instagram user profile fields exposed by the Graph API.
  */
 export interface InstagramUser {
-  /** Instagram-scoped user ID. */
+  /** App-scoped ID returned by the access token (the `/me` identity). */
   id: string;
+  /**
+   * Instagram professional account ID. Returned by Instagram Login `/me` and
+   * used as the entity ID in Instagram webhook notifications.
+   */
+  user_id?: string;
   /** Public username handle. */
   username?: string;
   /** Account display name. */
   name?: string;
-  /** Profile biography text. */
+  /**
+   * Account type. Instagram Login returns `Business` or `Media_Creator`;
+   * Facebook Login (IG User) may return values such as `BUSINESS`.
+   */
+  account_type?: string;
+  /** Profile biography text. Facebook Login (IG User) only. */
   biography?: string;
-  /** Public website URL from profile. */
+  /** Public website URL from profile. Facebook Login (IG User) only. */
   website?: string;
   /** Follower count when available to the token. */
   followers_count?: number;
@@ -26,11 +36,16 @@ export interface InstagramUser {
 
 /**
  * Fields that can be requested when retrieving user profile data.
+ *
+ * Note: `user_id` and `account_type` are primarily for Instagram Login, while
+ * `biography` and `website` are only available for Facebook Login (IG User).
  */
 export type InstagramUserField =
   | 'id'
+  | 'user_id'
   | 'username'
   | 'name'
+  | 'account_type'
   | 'biography'
   | 'website'
   | 'followers_count'

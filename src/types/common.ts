@@ -222,8 +222,20 @@ export interface AuthorizationUrlOptions {
   state?: string;
   /** Override default scopes for this authorization request. */
   scopes?: string[];
-  /** Force re-authentication even if the user is already logged in. */
+  /**
+   * Force re-authentication even if the user is already logged in.
+   *
+   * For Facebook Login this sets `auth_type=rerequest`; for Instagram Login it
+   * sets `force_reauth=true`, requiring the user to re-enter their Instagram
+   * professional account credentials.
+   */
   forceReauth?: boolean;
+  /**
+   * Instagram Login only. Controls whether the "Log in with Facebook" option is
+   * shown on the Instagram authorization page. Defaults to Meta's behavior
+   * (`true`) when omitted. Ignored for Facebook Login.
+   */
+  enableFacebookLogin?: boolean;
 }
 
 /**
@@ -333,9 +345,15 @@ export const OAUTH_DIALOG_URL = 'https://www.facebook.com';
 export const INSTAGRAM_GRAPH_API_BASE_URL = 'https://graph.instagram.com';
 
 /**
- * OAuth dialog host used by Instagram API with Instagram Login.
+ * Authorization dialog host used by Instagram API with Instagram Login.
+ *
+ * Meta serves the Business Login authorization window from
+ * `https://www.instagram.com/oauth/authorize`. The short-lived token exchange
+ * uses a different host ({@link INSTAGRAM_OAUTH_API_BASE_URL}).
+ *
+ * @see https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/business-login
  */
-export const INSTAGRAM_OAUTH_DIALOG_URL = 'https://api.instagram.com';
+export const INSTAGRAM_OAUTH_DIALOG_URL = 'https://www.instagram.com';
 
 /**
  * Token exchange host used by Instagram API with Instagram Login.

@@ -849,7 +849,7 @@ Set `intervalMs: 0` on `waitForContainerReady` to avoid timer delays.
 
 ## Version and semver
 
-- Package version: `0.2.0`
+- Package version: `0.3.0`
 - Exported constant: `VERSION`
 - Follow semver: MAJOR = breaking public API, MINOR = backward-compatible features, PATCH = fixes
 - Update `CHANGELOG.md` on releases

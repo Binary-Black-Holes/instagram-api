@@ -13,7 +13,7 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
 | Field               | Value                                               |
 | ------------------- | --------------------------------------------------- |
 | **npm name**        | `@binary-black-holes/instagram-api`                 |
-| **Version**         | `0.2.0` (also exported as `VERSION` constant)       |
+| **Version**         | `0.3.0` (also exported as `VERSION` constant)       |
 | **Runtime**         | Node.js 18+                                         |
 | **Module format**   | ESM primary (`import`), CJS supported (`require`)   |
 | **Entry point**     | `src/index.ts` → `dist/index.js` / `dist/index.cjs` |
@@ -83,9 +83,12 @@ OAuthProvider                    InstagramClient
 ├── listConnectedAccounts()      ├── insights   → user + media analytics
 └── debugToken()                 ├── commerce   → catalogs, product tags
                                  ├── messaging  → DM, media share, private replies
-                                 └── webhooks   → subscribe/unsubscribe (Graph API)
+                                 ├── webhooks   → subscribe/unsubscribe (Graph API)
+                                 └── useCases   → commentModeration, privateReplies, selfMessaging
+                                                  (high-level flows composed from resources)
 
-Standalone webhook helpers: verifyWebhookChallenge, verifyWebhookSignature,
+Standalone webhook helpers: InstagramWebhookHandler (verify + dispatch),
+                           verifyWebhookChallenge, verifyWebhookSignature,
                            parseWebhookPayload, parseVerifiedWebhookPayload
 
 Shared internals: HttpClient → Axios, retries, error mapping
@@ -117,6 +120,8 @@ Need all items from a paginated list?
   └─ Generic: iteratePages() or collectAllPages()
 
 Need webhook handling in Express/Fastify/etc.?
+  ├─ Recommended → new InstagramWebhookHandler({ appSecret, verifyToken })
+  │                 .handleVerification(query) (GET) + .handleEvent(rawBody, { signatureHeader }) (POST)
   ├─ GET setup → verifyWebhookChallenge(query, verifyToken)
   └─ POST events → parseVerifiedWebhookPayload(rawBody, { signatureHeader, appSecret })
 
@@ -191,8 +196,9 @@ Import everything from `@binary-black-holes/instagram-api`:
 | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Clients**    | `InstagramClient`, `OAuthProvider`, `HttpClient`                                                                                                                                                                                                                           |
 | **Resources**  | `BaseResource`, `UsersResource`, `MediaResource`, `HashtagsResource`, `InsightsResource`, `CommerceResource`, `MessagingResource`, `WebhooksResource`                                                                                                                      |
+| **Use cases**  | `InstagramUseCases`, `CommentModerationUseCase`, `PrivateRepliesUseCase`, `SelfMessagingUseCase` (also `client.useCases`)                                                                                                                                                  |
 | **Errors**     | `InstagramApiError`, `AuthenticationError`, `RateLimitError`, `ValidationError`, `NotFoundError`, `createErrorFromResponse`                                                                                                                                                |
-| **Webhooks**   | `verifyWebhookSignature`, `verifyWebhookChallenge`, `parseWebhookPayload`, `parseVerifiedWebhookPayload`                                                                                                                                                                   |
+| **Webhooks**   | `InstagramWebhookHandler`, `verifyWebhookSignature`, `verifyWebhookChallenge`, `parseWebhookPayload`, `parseVerifiedWebhookPayload`                                                                                                                                        |
 | **Pagination** | `iteratePages`, `collectAllPages`                                                                                                                                                                                                                                          |
 | **Constants**  | `VERSION`, `DEFAULT_OAUTH_SCOPES`, `DEFAULT_INSTAGRAM_BUSINESS_OAUTH_SCOPES`, `DEFAULT_INSTAGRAM_LOGIN_SCOPES`, `GRAPH_API_BASE_URL`, `INSTAGRAM_GRAPH_API_BASE_URL`, `OAUTH_DIALOG_URL`, `INSTAGRAM_OAUTH_DIALOG_URL`, `INSTAGRAM_OAUTH_API_BASE_URL`, `RUPLOAD_BASE_URL` |
 | **Utils**      | `buildQueryString`, `joinUrl`, `resolveFields`, `pickDefined`, `extractPublishingQuota`, etc.                                                                                                                                                                              |
@@ -219,7 +225,12 @@ src/
 │   ├── CommerceResource.ts
 │   ├── MessagingResource.ts
 │   └── WebhooksResource.ts
-├── webhooks/             # Standalone verify/parse (no client needed)
+├── use-cases/            # High-level workflows composed from resources
+│   ├── index.ts          # InstagramUseCases — merged onto client.useCases
+│   ├── comment-moderation/
+│   ├── private-replies/
+│   └── self-messaging/
+├── webhooks/             # Standalone verify/parse + InstagramWebhookHandler
 ├── errors/
 │   └── InstagramApiError.ts
 ├── types/                # One file per domain (user, media, insights, …)

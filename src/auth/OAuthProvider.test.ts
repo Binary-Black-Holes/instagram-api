@@ -64,10 +64,29 @@ describe('OAuthProvider', () => {
 
     const url = oauth.getAuthorizationUrl({ state: 'csrf-token' });
 
-    expect(url).toContain('https://api.instagram.com/oauth/authorize');
+    expect(url).toContain('https://www.instagram.com/oauth/authorize');
     expect(url).toContain('client_id=app-id');
     expect(url).toContain('instagram_business_basic');
     expect(url).toContain('state=csrf-token');
+    expect(url).not.toContain('api.instagram.com/oauth/authorize');
+  });
+
+  it('adds force_reauth and enable_fb_login to Instagram Login authorization URLs', () => {
+    const oauth = new OAuthProvider({
+      loginType: 'instagram',
+      clientId: 'app-id',
+      clientSecret: 'app-secret',
+      redirectUri: 'https://example.com/callback',
+    });
+
+    const url = oauth.getAuthorizationUrl({
+      forceReauth: true,
+      enableFacebookLogin: false,
+    });
+
+    expect(url).toContain('force_reauth=true');
+    expect(url).toContain('enable_fb_login=false');
+    expect(url).not.toContain('auth_type=rerequest');
   });
 
   it('exchanges Instagram Login authorization codes through api.instagram.com', async () => {

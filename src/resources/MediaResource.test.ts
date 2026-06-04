@@ -77,6 +77,24 @@ describe('MediaResource', () => {
     expect(published.id).toBe('17920238422030506');
   });
 
+  it('lists comment replies and toggles comments on media', async () => {
+    const { media, mock } = createMediaResource();
+
+    mock.setResponseFor('/comment-1/replies', {
+      status: 200,
+      data: { data: [{ id: 'reply-1', text: 'hi' }] },
+    });
+    mock.setResponseFor(/\/media-1$/, { status: 200, data: { success: true } });
+
+    const replies = await media.listCommentReplies('comment-1');
+    expect(replies.data[0]?.id).toBe('reply-1');
+
+    await media.setCommentsEnabled('media-1', false);
+    const disableCall = mock.mockRequest.mock.calls.at(-1)?.[0];
+    expect(disableCall?.url).toContain('comment_enabled=false');
+    expect(disableCall?.method).toBe('POST');
+  });
+
   it('rejects publishWhenReady when quota is exhausted', async () => {
     const { media, mock } = createMediaResource();
 

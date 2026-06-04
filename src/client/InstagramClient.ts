@@ -11,6 +11,7 @@ import {
 import type { InstagramClientConfig } from '../types/common.js';
 import { ValidationError } from '../errors/index.js';
 import { pickDefined } from '../utils/pickDefined.js';
+import { InstagramUseCases } from '../use-cases/index.js';
 
 /**
  * Primary entry point for the Instagram Graph API SDK.
@@ -47,6 +48,11 @@ export class InstagramClient {
   readonly messaging: MessagingResource;
   /** Webhook subscription management. */
   readonly webhooks: WebhooksResource;
+  /**
+   * High-level, multi-step use-case workflows (comment moderation, private
+   * replies, self messaging) composed from the resource modules above.
+   */
+  readonly useCases: InstagramUseCases;
 
   private readonly http: HttpClient;
   private accountId: string;
@@ -89,6 +95,11 @@ export class InstagramClient {
     this.commerce = new CommerceResource(this.http, this.accountId);
     this.messaging = new MessagingResource(this.http, this.accountId);
     this.webhooks = new WebhooksResource(this.http, this.accountId);
+
+    this.useCases = new InstagramUseCases({
+      media: this.media,
+      messaging: this.messaging,
+    });
   }
 
   /**

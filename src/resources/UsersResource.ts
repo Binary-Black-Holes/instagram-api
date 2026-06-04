@@ -14,12 +14,34 @@ import { collectAllPages } from '../utils/pagination.js';
 import { resolveFields } from '../utils/url.js';
 import { BaseResource } from './BaseResource.js';
 
-const DEFAULT_USER_FIELDS = [
+/**
+ * Default profile fields for Facebook Login (IG User), which exposes
+ * `biography` and `website`.
+ */
+const DEFAULT_FACEBOOK_USER_FIELDS = [
   'id',
   'username',
   'name',
   'biography',
   'website',
+  'followers_count',
+  'follows_count',
+  'media_count',
+  'profile_picture_url',
+] as const;
+
+/**
+ * Default profile fields for Instagram Login `/me`. Meta does not expose
+ * `biography`/`website` here and recommends `user_id`/`account_type`.
+ *
+ * @see https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/get-started
+ */
+const DEFAULT_INSTAGRAM_USER_FIELDS = [
+  'id',
+  'user_id',
+  'username',
+  'name',
+  'account_type',
   'followers_count',
   'follows_count',
   'media_count',
@@ -45,10 +67,14 @@ export class UsersResource extends BaseResource {
    */
   async getProfile(options: GetProfileOptions = {}): Promise<InstagramUser> {
     const accountId = this.resolveAccountId();
+    const defaultFields =
+      this.getLoginType() === 'instagram'
+        ? [...DEFAULT_INSTAGRAM_USER_FIELDS]
+        : [...DEFAULT_FACEBOOK_USER_FIELDS];
     const response = await this.http.request<InstagramUser>({
       path: `/${accountId}`,
       params: {
-        fields: resolveFields(options.fields, [...DEFAULT_USER_FIELDS]),
+        fields: resolveFields(options.fields, defaultFields),
       },
     });
 

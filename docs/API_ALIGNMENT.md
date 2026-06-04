@@ -39,11 +39,13 @@ SDK mapping:
 
 Meta's documented Instagram Login setup flow is:
 
-1. Redirect the user through Instagram OAuth.
+1. Redirect the user through the authorization window at `https://www.instagram.com/oauth/authorize`.
 2. Exchange the authorization code at `POST https://api.instagram.com/oauth/access_token`.
 3. Exchange the short-lived Instagram User token at `GET https://graph.instagram.com/access_token`.
 4. Refresh long-lived Instagram User tokens at `GET https://graph.instagram.com/refresh_access_token`.
 5. Construct `InstagramClient` with `loginType: 'instagram'` and the Instagram User access token.
+
+The authorization request supports `force_reauth` (re-prompt for Instagram credentials) and `enable_fb_login` (toggle the "Log in with Facebook" option). The SDK exposes these via `AuthorizationUrlOptions.forceReauth` and `AuthorizationUrlOptions.enableFacebookLogin`.
 
 SDK mapping:
 
@@ -78,7 +80,7 @@ For Instagram Login, `InstagramClient` expects an **Instagram User access token*
 | `GRAPH_API_BASE_URL`           | `https://graph.facebook.com`   | Graph API host                     |
 | `OAUTH_DIALOG_URL`             | `https://www.facebook.com`     | Facebook Login dialog              |
 | `INSTAGRAM_GRAPH_API_BASE_URL` | `https://graph.instagram.com`  | Instagram Login Graph API host     |
-| `INSTAGRAM_OAUTH_DIALOG_URL`   | `https://api.instagram.com`    | Instagram Login OAuth dialog host  |
+| `INSTAGRAM_OAUTH_DIALOG_URL`   | `https://www.instagram.com`    | Instagram Login authorization host |
 | `INSTAGRAM_OAUTH_API_BASE_URL` | `https://api.instagram.com`    | Instagram Login code exchange host |
 | `RUPLOAD_BASE_URL`             | `https://rupload.facebook.com` | Resumable video upload host        |
 | Default version                | `v21.0`                        | Configurable via `apiVersion`      |
@@ -109,12 +111,12 @@ POST operations generally send parameters in the query string, matching Meta's p
 
 ### Users
 
-| SDK method                        | Meta endpoint                                                    | Notes                                      |
-| --------------------------------- | ---------------------------------------------------------------- | ------------------------------------------ |
-| `client.users.getProfile()`       | `GET /{ig-user-id}?fields=...` or `GET /me?fields=...`           | Aligned; Instagram Login defaults to `/me` |
-| `client.users.listMedia()`        | `GET /{ig-user-id}/media` or `GET /me/media`                     | Aligned                                    |
-| `client.users.listAllMedia()`     | Paginated `GET /{ig-user-id}/media`                              | SDK helper                                 |
-| `client.users.discoverBusiness()` | `GET /{ig-user-id}?fields=business_discovery.username(...){...}` | Facebook Login only                        |
+| SDK method                        | Meta endpoint                                                    | Notes                                                                                                                                                           |
+| --------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `client.users.getProfile()`       | `GET /{ig-user-id}?fields=...` or `GET /me?fields=...`           | Instagram Login defaults to `/me`; default fields are login-type aware (`user_id`/`account_type` for Instagram Login, `biography`/`website` for Facebook Login) |
+| `client.users.listMedia()`        | `GET /{ig-user-id}/media` or `GET /me/media`                     | Aligned                                                                                                                                                         |
+| `client.users.listAllMedia()`     | Paginated `GET /{ig-user-id}/media`                              | SDK helper                                                                                                                                                      |
+| `client.users.discoverBusiness()` | `GET /{ig-user-id}?fields=business_discovery.username(...){...}` | Facebook Login only                                                                                                                                             |
 
 Reference: [IG User](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user), [Business Discovery](https://developers.facebook.com/docs/instagram-platform/instagram-graph-api/reference/ig-user/business_discovery)
 
@@ -136,8 +138,10 @@ Reference: [IG User](https://developers.facebook.com/docs/instagram-platform/ins
 | `client.media.publishWhenReady()`               | quota check + poll + publish                       | SDK helper                                                     |
 | `client.media.assertPublishingQuotaAvailable()` | `GET /{ig-user-id}/content_publishing_limit`       | Throws when quota exhausted                                    |
 | `client.media.replyToComment()`                 | `POST /{ig-comment-id}/replies`                    | JSON body `{ message }`                                        |
+| `client.media.listCommentReplies()`             | `GET /{ig-comment-id}/replies`                     | Aligned                                                        |
 | `client.media.deleteComment()`                  | `DELETE /{ig-comment-id}`                          | Aligned                                                        |
 | `client.media.setCommentHidden()`               | `POST /{ig-comment-id}?hide=...`                   | Aligned                                                        |
+| `client.media.setCommentsEnabled()`             | `POST /{ig-media-id}?comment_enabled=...`          | Enable/disable comments on a media                             |
 
 Reference: [Content publishing](https://developers.facebook.com/docs/instagram-platform/content-publishing), [Resumable uploads](https://developers.facebook.com/docs/instagram-platform/content-publishing/resumable-uploads), [Comment moderation](https://developers.facebook.com/docs/instagram-platform/comment-moderation)
 
@@ -165,12 +169,18 @@ Hashtag media endpoints require Instagram Public Content Access and are subject 
 
 ### Webhook server helpers
 
-| SDK helper                      | Purpose                                          |
-| ------------------------------- | ------------------------------------------------ |
-| `verifyWebhookChallenge()`      | Validates Meta webhook setup GET requests        |
-| `verifyWebhookSignature()`      | Validates `X-Hub-Signature-256` on POST payloads |
-| `parseWebhookPayload()`         | Parses webhook JSON payloads                     |
-| `parseVerifiedWebhookPayload()` | Verifies signature then parses payload           |
+| SDK helper                      | Purpose                                                           |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `InstagramWebhookHandler`       | Framework-agnostic handler: verify + parse + typed event dispatch |
+| `verifyWebhookChallenge()`      | Validates Meta webhook setup GET requests                         |
+| `verifyWebhookSignature()`      | Validates `X-Hub-Signature-256` on POST payloads                  |
+| `parseWebhookPayload()`         | Parses webhook JSON payloads                                      |
+| `parseVerifiedWebhookPayload()` | Verifies signature then parses payload                            |
+
+`InstagramWebhookHandler` exposes `handleVerification(query)` for the GET handshake and
+`handleEvent(rawBody, { signatureHeader })` for POST delivery. Register listeners via `on(field)`,
+`onComment`, `onMention`, `onLiveComment`, `onChange`, `onMessaging`, `onMessage`, `onMessageEcho`,
+`onReaction`, `onPostback`, `onRead`, `onMessagingType`, and `onError`.
 
 Reference: [Webhooks](https://developers.facebook.com/docs/instagram-platform/webhooks)
 
@@ -214,6 +224,32 @@ Reference: [Product tagging](https://developers.facebook.com/docs/instagram-plat
 Reference: [Messaging API](https://developers.facebook.com/docs/instagram-platform/instagram-api-with-instagram-login/messaging-api), [Private replies](https://developers.facebook.com/docs/instagram-platform/private-replies)
 
 Requires `instagram_manage_messages` or `instagram_business_manage_messages` depending on app configuration.
+
+### Use cases (high-level workflows)
+
+`client.useCases` aggregates orchestration classes that compose the resource modules into the
+end-to-end flows Meta documents as platform "use cases". They hold the same resource instances the
+client owns, so token/account updates propagate automatically.
+
+| Use case                                                   | SDK method                                             | Composes / Meta endpoint                          |
+| ---------------------------------------------------------- | ------------------------------------------------------ | ------------------------------------------------- |
+| `client.useCases.commentModeration.getComments()`          | `GET /{ig-media-id}/comments`                          | `media.listComments`                              |
+| `client.useCases.commentModeration.getReplies()`           | `GET /{ig-comment-id}/replies`                         | `media.listCommentReplies`                        |
+| `client.useCases.commentModeration.reply()`                | `POST /{ig-comment-id}/replies`                        | `media.replyToComment`                            |
+| `client.useCases.commentModeration.hide()` / `unhide()`    | `POST /{ig-comment-id}?hide=...`                       | `media.setCommentHidden`                          |
+| `client.useCases.commentModeration.delete()`               | `DELETE /{ig-comment-id}`                              | `media.deleteComment`                             |
+| `client.useCases.commentModeration.disableComments()`      | `POST /{ig-media-id}?comment_enabled=false`            | `media.setCommentsEnabled`                        |
+| `client.useCases.commentModeration.enableComments()`       | `POST /{ig-media-id}?comment_enabled=true`             | `media.setCommentsEnabled`                        |
+| `client.useCases.commentModeration.fromWebhookEvent()`     | n/a                                                    | Normalizes both login-type comment payloads       |
+| `client.useCases.privateReplies.sendToComment()`           | `POST /{ig-user-id}/messages` (`recipient.comment_id`) | `messaging.sendPrivateReply`                      |
+| `client.useCases.privateReplies.replyToCommentEvent()`     | `POST /{ig-user-id}/messages`                          | Resolves comment ID from a webhook then replies   |
+| `client.useCases.selfMessaging.sendToSelf()`               | `POST /{ig-user-id}/messages`                          | `messaging.sendTextMessage` (no 24h window)       |
+| `client.useCases.selfMessaging.isSelfEvent()` / `isEcho()` | n/a                                                    | Detects `is_self` / `is_echo` on messaging events |
+| `client.useCases.selfMessaging.replyToSelfEvent()`         | `POST /{ig-user-id}/messages`                          | Replies to a self event by sender ID              |
+
+Reference: [Comment Moderation](https://developers.facebook.com/docs/instagram-platform/comment-moderation), [Private Replies](https://developers.facebook.com/docs/instagram-platform/private-replies), [Self Messaging](https://developers.facebook.com/docs/instagram-platform/self-messaging)
+
+Private replies are limited to one message within 7 days of the comment (during the broadcast only for Instagram Live). Self messaging is exempt from the 24-hour messaging window.
 
 ### Webhooks
 

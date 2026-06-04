@@ -138,6 +138,13 @@ export type {
   InstagramWebhookEntry,
   InstagramWebhookChange,
   InstagramWebhookMessagingEvent,
+  InstagramMessagingEventType,
+  WebhookChangeEvent,
+  WebhookMessagingEvent,
+  WebhookChangeListener,
+  WebhookMessagingListener,
+  WebhookErrorListener,
+  InstagramWebhookHandlerConfig,
 } from './webhooks.js';
 
 export type {

@@ -7,6 +7,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-04
+
+### Added
+
+- Added `InstagramWebhookHandler` — a framework-agnostic webhook handler that combines GET challenge verification, `X-Hub-Signature-256` verification, payload parsing, and typed event dispatch (`onComment`, `onMention`, `onLiveComment`, `onMessage`, `onMessageEcho`, `onReaction`, `onPostback`, `onRead`, `onMessagingType`, `onChange`, `onMessaging`, `onError`)
+- Added high-level use-case workflows exposed via `client.useCases`: `CommentModerationUseCase`, `PrivateRepliesUseCase`, and `SelfMessagingUseCase`
+- Added `MediaResource.listCommentReplies()` (`GET /{ig-comment-id}/replies`) and `MediaResource.setCommentsEnabled()` (`POST /{ig-media-id}?comment_enabled=...`)
+- Added `user_id` and `account_type` fields to Instagram user types, with login-type-aware default profile fields in `UsersResource.getProfile()`
+- Added `forceReauth`/`enableFacebookLogin` authorization options and richer messaging webhook event types (`is_self`, `is_echo`, reactions, postbacks, reads)
+
+### Fixed
+
+- Fixed the Instagram Login authorization host to `https://www.instagram.com/oauth/authorize` (was incorrectly using `api.instagram.com`), and used `force_reauth` instead of `auth_type=rerequest` for Instagram Login
+
 ## [0.2.0] - 2026-06-03
 
 ### Added
@@ -52,6 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Axios-based HTTP transport with retries, timeouts, optional hooks, and typed error mapping
 - ESM and CJS builds with TypeScript declarations and source maps
 
+[0.3.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.2.0
 [0.1.2]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.1.2
 [0.1.1]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.1.1

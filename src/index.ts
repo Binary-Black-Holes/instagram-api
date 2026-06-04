@@ -34,7 +34,22 @@ export {
   verifyWebhookChallenge,
   parseWebhookPayload,
   parseVerifiedWebhookPayload,
+  InstagramWebhookHandler,
 } from './webhooks/index.js';
+
+export type { HandleEventOptions, HandleEventResult } from './webhooks/index.js';
+
+export {
+  InstagramUseCases,
+  CommentModerationUseCase,
+  PrivateRepliesUseCase,
+  SelfMessagingUseCase,
+} from './use-cases/index.js';
+
+export type {
+  InstagramUseCasesDependencies,
+  ModeratedComment,
+} from './use-cases/index.js';
 
 export type {
   GraphApiVersion,
@@ -121,6 +136,13 @@ export type {
   InstagramWebhookEntry,
   InstagramWebhookChange,
   InstagramWebhookMessagingEvent,
+  InstagramMessagingEventType,
+  WebhookChangeEvent,
+  WebhookMessagingEvent,
+  WebhookChangeListener,
+  WebhookMessagingListener,
+  WebhookErrorListener,
+  InstagramWebhookHandlerConfig,
   DiscoveredBusiness,
   BusinessDiscoveryField,
   BusinessDiscoveryOptions,
@@ -170,4 +192,4 @@ export {
 export { iteratePages, collectAllPages } from './utils/index.js';
 export type { WithoutUndefined } from './utils/index.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';

@@ -39,26 +39,31 @@ npm install @binary-black-holes/instagram-api
 ## Quick Start: Facebook Login
 
 ```ts
-import { InstagramClient, OAuthProvider } from '@binary-black-holes/instagram-api';
+import {
+  InstagramClient,
+  OAuthProvider,
+} from "@binary-black-holes/instagram-api";
 
 const oauth = new OAuthProvider({
   clientId: process.env.META_APP_ID!,
   clientSecret: process.env.META_APP_SECRET!,
-  redirectUri: 'https://example.com/auth/instagram/callback',
+  redirectUri: "https://example.com/auth/instagram/callback",
 });
 
 // After OAuth, discover the connected Page + Instagram account
 const accounts = await oauth.listConnectedAccounts(userAccessToken);
-const page = accounts.data.find((entry) => entry.instagram_business_account?.id);
+const page = accounts.data.find(
+  (entry) => entry.instagram_business_account?.id,
+);
 
 const client = new InstagramClient({
   accessToken: page!.access_token!,
   instagramAccountId: page!.instagram_business_account!.id,
-  apiVersion: 'v21.0',
+  apiVersion: "v21.0",
 });
 
 const profile = await client.users.getProfile({
-  fields: ['id', 'username', 'followers_count', 'media_count'],
+  fields: ["id", "username", "followers_count", "media_count"],
 });
 
 const mediaPage = await client.users.listMedia({ limit: 25 });
@@ -68,26 +73,34 @@ console.log(profile.username, mediaPage.data.length);
 ## Quick Start: Instagram Login
 
 ```ts
-import { InstagramClient, OAuthProvider } from '@binary-black-holes/instagram-api';
+import {
+  InstagramClient,
+  OAuthProvider,
+} from "@binary-black-holes/instagram-api";
 
 const oauth = new OAuthProvider({
-  loginType: 'instagram',
+  loginType: "instagram",
   clientId: process.env.INSTAGRAM_APP_ID!,
   clientSecret: process.env.INSTAGRAM_APP_SECRET!,
-  redirectUri: 'https://example.com/auth/instagram/callback',
+  redirectUri: "https://example.com/auth/instagram/callback",
 });
 
-const authUrl = oauth.getAuthorizationUrl({ state: 'secure-random-state' });
+const authUrl = oauth.getAuthorizationUrl({ state: "secure-random-state" });
 const shortLived = await oauth.exchangeCodeForToken(code);
-const longLived = await oauth.exchangeForLongLivedToken(shortLived.access_token);
+const longLived = await oauth.exchangeForLongLivedToken(
+  shortLived.access_token,
+);
 
 const client = new InstagramClient({
-  loginType: 'instagram',
+  loginType: "instagram",
   accessToken: longLived.access_token,
-  apiVersion: 'v25.0',
+  apiVersion: "v25.0",
 });
 
-const profile = await client.users.getProfile({ fields: ['id', 'username'] });
+// Instagram Login `/me` returns `user_id` (the IG professional account ID) and `account_type`.
+const profile = await client.users.getProfile({
+  fields: ["user_id", "username", "account_type"],
+});
 ```
 
 ## OAuth flow
@@ -95,23 +108,25 @@ const profile = await client.users.getProfile({ fields: ['id', 'username'] });
 Use `OAuthProvider` to implement either Meta login product. Facebook Login is the default and discovers a Page access token; Instagram Login is opt-in and uses Instagram User access tokens directly.
 
 ```ts
-import { OAuthProvider } from '@binary-black-holes/instagram-api';
+import { OAuthProvider } from "@binary-black-holes/instagram-api";
 
 const oauth = new OAuthProvider({
-  loginType: 'facebook', // or 'instagram'
+  loginType: "facebook", // or 'instagram'
   clientId: process.env.META_APP_ID!,
   clientSecret: process.env.META_APP_SECRET!,
-  redirectUri: 'https://example.com/auth/instagram/callback',
+  redirectUri: "https://example.com/auth/instagram/callback",
 });
 
 // 1. Redirect the user to Meta OAuth
-const authUrl = oauth.getAuthorizationUrl({ state: 'secure-random-state' });
+const authUrl = oauth.getAuthorizationUrl({ state: "secure-random-state" });
 
 // 2. Exchange authorization code after redirect
 const shortLived = await oauth.exchangeCodeForToken(req.query.code);
 
 // 3. Upgrade to long-lived token (~60 days)
-const longLived = await oauth.exchangeForLongLivedToken(shortLived.access_token);
+const longLived = await oauth.exchangeForLongLivedToken(
+  shortLived.access_token,
+);
 
 // 4. Refresh long-lived tokens before expiry
 const refreshed = await oauth.refreshLongLivedToken(longLived.access_token);
@@ -155,20 +170,27 @@ InstagramClient
 ├── insights   → account and media analytics
 ├── commerce   → catalogs, product search, product tags
 ├── messaging  → direct messages and private replies
-└── webhooks   → subscription management
+├── webhooks   → subscription management
+└── useCases   → high-level workflows composed from the resources
+    ├── commentModeration → get/reply/hide/delete/toggle comments
+    ├── privateReplies    → private DM replies to commenters
+    └── selfMessaging     → self-message send + webhook detection
 
 OAuthProvider  → authorization, account discovery, token lifecycle
 HttpClient     → Axios transport, retries, resumable uploads
 ```
 
 Each resource extends `BaseResource` and shares a single authenticated `HttpClient` instance.
+The `useCases` namespace composes those resources into the end-to-end flows documented by Meta
+(Comment Moderation, Private Replies, Self Messaging) and reuses the same shared resource
+instances, so account/token updates apply to use cases automatically.
 
 ## API overview
 
 ### Users
 
 ```ts
-await client.users.getProfile({ fields: ['id', 'username', 'biography'] });
+await client.users.getProfile({ fields: ["id", "username", "biography"] });
 await client.users.listMedia({ limit: 50 });
 await client.users.listAllMedia();
 ```
@@ -176,29 +198,70 @@ await client.users.listAllMedia();
 ### Media
 
 ```ts
-await client.media.getById('media-id');
-await client.media.listComments('media-id');
+await client.media.getById("media-id");
+await client.media.listComments("media-id");
 await client.media.createImageContainer({
-  imageUrl: 'https://cdn.example/image.jpg',
-  caption: 'Hello',
-  altText: 'Product photo on a white background',
+  imageUrl: "https://cdn.example/image.jpg",
+  caption: "Hello",
+  altText: "Product photo on a white background",
 });
-await client.media.publish('container-id');
-await client.media.publishWhenReady('container-id', { enforceQuota: true });
+await client.media.publish("container-id");
+await client.media.publishWhenReady("container-id", { enforceQuota: true });
 await client.media.getContentPublishingLimit();
-await client.media.setCommentHidden('comment-id', true);
+await client.media.setCommentHidden("comment-id", true);
+```
+
+### Use cases (high-level workflows)
+
+`client.useCases` exposes multi-step flows composed from the resource modules, aligned with Meta's
+[Comment Moderation](https://developers.facebook.com/docs/instagram-platform/comment-moderation),
+[Private Replies](https://developers.facebook.com/docs/instagram-platform/private-replies), and
+[Self Messaging](https://developers.facebook.com/docs/instagram-platform/self-messaging) guides.
+
+```ts
+// Comment moderation
+await client.useCases.commentModeration.reply(
+  "comment-id",
+  "Thanks for sharing!",
+);
+await client.useCases.commentModeration.hide("comment-id");
+await client.useCases.commentModeration.disableComments("media-id");
+const replies =
+  await client.useCases.commentModeration.getReplies("comment-id");
+
+// Combine with the webhook handler: normalize the comment, then reply privately
+handler.onComment(async (event) => {
+  const comment = client.useCases.commentModeration.fromWebhookEvent(event);
+  if (comment.commentId) {
+    // Private replies must be sent within 7 days of the comment
+    await client.useCases.privateReplies.sendToComment(
+      comment.commentId,
+      "Sent you a DM!",
+    );
+  }
+});
+
+// Self messaging (no 24-hour window) — respond to echo/postback events
+handler.onMessaging(async (event) => {
+  if (client.useCases.selfMessaging.isSelfEvent(event)) {
+    await client.useCases.selfMessaging.replyToSelfEvent(
+      event,
+      "Preview reply",
+    );
+  }
+});
 ```
 
 ### Hashtags
 
 ```ts
-const search = await client.hashtags.search('coke');
+const search = await client.hashtags.search("coke");
 const hashtagId = search.data[0]?.id;
 
 if (hashtagId) {
   await client.hashtags.getById(hashtagId);
   await client.hashtags.listRecentMedia(hashtagId, {
-    fields: ['id', 'media_type', 'comments_count', 'like_count'],
+    fields: ["id", "media_type", "comments_count", "like_count"],
     limit: 25,
   });
   await client.hashtags.listTopMedia(hashtagId);
@@ -207,21 +270,80 @@ if (hashtagId) {
 
 Hashtag media endpoints require Meta's Instagram Public Content Access feature.
 
-### Webhook verification
+### Webhook handler (recommended)
+
+`InstagramWebhookHandler` bundles the GET verification challenge, `X-Hub-Signature-256`
+verification, payload parsing, and typed event dispatch. It is framework-agnostic — wire it
+into Express, Fastify, Next.js route handlers, or any HTTP server. Always pass the **raw request
+body** (before JSON parsing) so the signature check is valid.
+
+```ts
+import { InstagramWebhookHandler } from "@binary-black-holes/instagram-api";
+
+const handler = new InstagramWebhookHandler({
+  appSecret: process.env.META_APP_SECRET!,
+  verifyToken: process.env.WEBHOOK_VERIFY_TOKEN!,
+});
+
+handler
+  .onComment(({ value, entryId }) => console.log("comment on", entryId, value))
+  .onMention(({ value }) => console.log("mentioned in", value))
+  .onMessage(({ messaging }) => console.log("dm:", messaging.message?.text))
+  .onReaction(({ messaging }) =>
+    console.log("reaction:", messaging.reaction?.reaction),
+  )
+  .onError((error) => console.error("listener failed", error));
+
+// GET /webhooks/instagram — Meta setup handshake
+app.get("/webhooks/instagram", (req, res) => {
+  try {
+    res.send(handler.handleVerification(req.query));
+  } catch {
+    res.sendStatus(403);
+  }
+});
+
+// POST /webhooks/instagram — event delivery (raw body required)
+app.post(
+  "/webhooks/instagram",
+  express.raw({ type: "*/*" }),
+  async (req, res) => {
+    try {
+      await handler.handleEvent(req.body, {
+        signatureHeader: req.header("x-hub-signature-256"),
+      });
+      res.sendStatus(200);
+    } catch {
+      res.sendStatus(400);
+    }
+  },
+);
+```
+
+Supported listeners: `on(field, fn)`, `onChange`, `onComment`, `onLiveComment`, `onMention`,
+`onMessaging`, `onMessage`, `onMessageEcho`, `onReaction`, `onPostback`, `onRead`,
+`onMessagingType(type, fn)`, and `onError`.
+
+### Low-level webhook helpers
+
+If you prefer to handle routing yourself, the underlying helpers remain available:
 
 ```ts
 import {
   verifyWebhookChallenge,
   verifyWebhookSignature,
   parseVerifiedWebhookPayload,
-} from '@binary-black-holes/instagram-api';
+} from "@binary-black-holes/instagram-api";
 
 // Meta setup handshake (GET)
-const challenge = verifyWebhookChallenge(req.query, process.env.WEBHOOK_VERIFY_TOKEN!);
+const challenge = verifyWebhookChallenge(
+  req.query,
+  process.env.WEBHOOK_VERIFY_TOKEN!,
+);
 
 // Event delivery (POST)
 const payload = parseVerifiedWebhookPayload(rawBody, {
-  signatureHeader: req.headers['x-hub-signature-256'],
+  signatureHeader: req.headers["x-hub-signature-256"],
   appSecret: process.env.META_APP_SECRET!,
 });
 ```
@@ -230,11 +352,11 @@ const payload = parseVerifiedWebhookPayload(rawBody, {
 
 ```ts
 const client = new InstagramClient({
-  accessToken: '...',
-  instagramAccountId: '...',
+  accessToken: "...",
+  instagramAccountId: "...",
   hooks: {
     onResponse: ({ path, status, durationMs }) => {
-      metrics.record('instagram_api_request', { path, status, durationMs });
+      metrics.record("instagram_api_request", { path, status, durationMs });
     },
   },
 });
@@ -244,12 +366,12 @@ const client = new InstagramClient({
 
 ```ts
 await client.insights.getUserInsights({
-  metrics: ['reach', 'accounts_engaged'],
-  period: 'day',
+  metrics: ["reach", "accounts_engaged"],
+  period: "day",
 });
 
-await client.insights.getMediaInsights('media-id', {
-  metrics: ['views', 'reach', 'saved'],
+await client.insights.getMediaInsights("media-id", {
+  metrics: ["views", "reach", "saved"],
 });
 ```
 
@@ -258,29 +380,39 @@ await client.insights.getMediaInsights('media-id', {
 Graph API list endpoints are cursor-based. Use built-in helpers:
 
 ```ts
-import { iteratePages, collectAllPages } from '@binary-black-holes/instagram-api';
+import {
+  iteratePages,
+  collectAllPages,
+} from "@binary-black-holes/instagram-api";
 
-for await (const item of iteratePages((options) => client.users.listMedia(options))) {
+for await (const item of iteratePages((options) =>
+  client.users.listMedia(options),
+)) {
   console.log(item.id);
 }
 
-const allMedia = await collectAllPages((options) => client.users.listMedia(options));
+const allMedia = await collectAllPages((options) =>
+  client.users.listMedia(options),
+);
 ```
 
 ## Error handling
 
 Errors are mapped to typed classes:
 
-| Class | Typical cause |
-| --- | --- |
-| `AuthenticationError` | Invalid or expired access token |
-| `RateLimitError` | Graph API throttling |
-| `NotFoundError` | Missing media/user/comment |
-| `ValidationError` | Invalid SDK input before request |
-| `InstagramApiError` | Base class for all SDK failures |
+| Class                 | Typical cause                    |
+| --------------------- | -------------------------------- |
+| `AuthenticationError` | Invalid or expired access token  |
+| `RateLimitError`      | Graph API throttling             |
+| `NotFoundError`       | Missing media/user/comment       |
+| `ValidationError`     | Invalid SDK input before request |
+| `InstagramApiError`   | Base class for all SDK failures  |
 
 ```ts
-import { AuthenticationError, RateLimitError } from '@binary-black-holes/instagram-api';
+import {
+  AuthenticationError,
+  RateLimitError,
+} from "@binary-black-holes/instagram-api";
 
 try {
   await client.users.getProfile();
@@ -299,9 +431,9 @@ try {
 
 ```ts
 const client = new InstagramClient({
-  accessToken: '...',
-  instagramAccountId: '17841400000000000',
-  apiVersion: 'v21.0',
+  accessToken: "...",
+  instagramAccountId: "17841400000000000",
+  apiVersion: "v21.0",
   timeoutMs: 30_000,
   retry: {
     maxRetries: 3,
