@@ -157,12 +157,13 @@ Retries honor `Retry-After` header when present (surfaced on `RateLimitError.ret
 
 ### `client.users` — UsersResource
 
-| Method                      | Graph API                                                        | Returns                     | Notes                                                                                                                    |
-| --------------------------- | ---------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `getProfile(options?)`      | `GET /{ig-user-id}?fields=...`                                   | `InstagramUser`             | Default fields: id, username, name, biography, website, followers_count, follows_count, media_count, profile_picture_url |
-| `listMedia(options?)`       | `GET /{ig-user-id}/media`                                        | `UserMediaResponse`         | Paginated; supports limit, after, before, fields                                                                         |
-| `listAllMedia(options?)`    | Paginated helper                                                 | `InstagramMedia[]`          | Auto-follows cursors                                                                                                     |
-| `discoverBusiness(options)` | `GET /{ig-user-id}?fields=business_discovery.username(...){...}` | `BusinessDiscoveryResponse` | Requires `username`; competitor analytics                                                                                |
+| Method                           | Graph API                                                        | Returns                     | Notes                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `getProfile(options?)`           | `GET /{ig-user-id}?fields=...`                                   | `InstagramUser`             | Default fields: id, username, name, biography, website, followers_count, follows_count, media_count, profile_picture_url |
+| `resolveProfessionalAccountId()` | `GET /me?fields=user_id` (Instagram Login)                       | `string`                    | Professional Account ID for webhook `recipient.id` matching; not used for subscription paths                             |
+| `listMedia(options?)`            | `GET /{ig-user-id}/media`                                        | `UserMediaResponse`         | Paginated; supports limit, after, before, fields                                                                         |
+| `listAllMedia(options?)`         | Paginated helper                                                 | `InstagramMedia[]`          | Auto-follows cursors                                                                                                     |
+| `discoverBusiness(options)`      | `GET /{ig-user-id}?fields=business_discovery.username(...){...}` | `BusinessDiscoveryResponse` | Requires `username`; competitor analytics                                                                                |
 
 **Example — business discovery:**
 
@@ -353,11 +354,14 @@ All messaging methods send JSON body: `{ recipient, message }`.
 
 Graph API subscription management (not HTTP route hosting):
 
-| Method                | Graph API                                                  |
-| --------------------- | ---------------------------------------------------------- |
-| `subscribe(options)`  | `POST /{ig-user-id}/subscribed_apps?subscribed_fields=...` |
-| `unsubscribe()`       | `DELETE /{ig-user-id}/subscribed_apps`                     |
-| `listSubscriptions()` | `GET /{ig-user-id}/subscribed_apps`                        |
+| Method                | Graph API                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------ |
+| `subscribe(options)`  | Instagram Login: `POST /me/subscribed_apps?subscribed_fields=...` on graph.instagram.com         |
+|                       | Facebook Login: `POST /{ig-user-id}/subscribed_apps?subscribed_fields=...` on graph.facebook.com |
+| `unsubscribe()`       | Instagram Login: `DELETE /me/subscribed_apps` on graph.instagram.com                             |
+|                       | Facebook Login: `DELETE /{ig-user-id}/subscribed_apps` on graph.facebook.com                     |
+| `listSubscriptions()` | Instagram Login: `GET /me/subscribed_apps` on graph.instagram.com                                |
+|                       | Facebook Login: `GET /{ig-user-id}/subscribed_apps` on graph.facebook.com                        |
 
 ```ts
 await client.webhooks.subscribe({
@@ -813,17 +817,20 @@ Set `intervalMs: 0` on `waitForContainerReady` to avoid timer delays.
 
 ## 14. Meta platform pitfalls
 
-| Symptom                                      | Likely cause                             | Fix                                                     |
-| -------------------------------------------- | ---------------------------------------- | ------------------------------------------------------- |
-| `(#190) Invalid OAuth access token`          | User token instead of Page token         | `listConnectedAccounts()` → use Page `access_token`     |
-| `(#100) Unsupported get request`             | Wrong ID type or missing permission      | Verify IG account ID and App Review scopes              |
-| `(#10) Application does not have permission` | Missing scope or App Review              | Add scope to OAuth; submit for review                   |
-| Publishing `ERROR` status                    | Media URL not publicly accessible        | Ensure HTTPS URL reachable by Meta servers              |
-| Insight metric error                         | Deprecated or wrong media type           | Use `views`; check metric availability per product type |
-| Webhook signature mismatch                   | Parsed JSON body used for HMAC           | Use raw body buffer/string                              |
-| Rate limit 429                               | Too many requests                        | Use `error.retryAfterMs`; reduce concurrency            |
-| Empty `listConnectedAccounts`                | No Page linked to IG account             | User must connect IG Business account to Facebook Page  |
-| Messaging fails                              | Outside 24h window or missing permission | Check policy + `instagram_manage_messages` scope        |
+| Symptom                                      | Likely cause                             | Fix                                                                                                            |
+| -------------------------------------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `(#190) Invalid OAuth access token`          | User token instead of Page token         | `listConnectedAccounts()` → use Page `access_token`                                                            |
+| `(#100) Unsupported get request`             | Wrong ID type or missing permission      | Verify IG account ID and App Review scopes                                                                     |
+| `(#10) Application does not have permission` | Missing scope or App Review              | Add scope to OAuth; submit for review                                                                          |
+| Publishing `ERROR` status                    | Media URL not publicly accessible        | Ensure HTTPS URL reachable by Meta servers                                                                     |
+| Insight metric error                         | Deprecated or wrong media type           | Use `views`; check metric availability per product type                                                        |
+| Webhook signature mismatch                   | Parsed JSON body used for HMAC           | Use raw body buffer/string                                                                                     |
+| Rate limit 429                               | Too many requests                        | Use `error.retryAfterMs`; reduce concurrency                                                                   |
+| Empty `listConnectedAccounts`                | No Page linked to IG account             | User must connect IG Business account to Facebook Page                                                         |
+| Messaging fails                              | Outside 24h window or missing permission | Check policy + `instagram_manage_messages` scope                                                               |
+| Webhook subscribe fails (Instagram Login)    | OAuth `user_id` used as path segment     | SDK uses `/me/subscribed_apps`; call `client.users.resolveProfessionalAccountId()` for `recipient.id` matching |
+
+**Instagram Login webhooks:** Always call `client.webhooks.subscribe()` with an Instagram User access token. The SDK uses `/me/subscribed_apps` automatically — do not rely on OAuth `user_id` in the path. Store `user_id` from `GET /me?fields=user_id,username` (or `client.users.resolveProfessionalAccountId()`) for matching webhook `recipient.id`, not for subscription.
 
 ---
 
@@ -849,7 +856,7 @@ Set `intervalMs: 0` on `waitForContainerReady` to avoid timer delays.
 
 ## Version and semver
 
-- Package version: `0.3.0`
+- Package version: `0.3.1`
 - Exported constant: `VERSION`
 - Follow semver: MAJOR = breaking public API, MINOR = backward-compatible features, PATCH = fixes
 - Update `CHANGELOG.md` on releases

@@ -13,7 +13,7 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
 | Field               | Value                                               |
 | ------------------- | --------------------------------------------------- |
 | **npm name**        | `@binary-black-holes/instagram-api`                 |
-| **Version**         | `0.3.0` (also exported as `VERSION` constant)       |
+| **Version**         | `0.3.1` (also exported as `VERSION` constant)       |
 | **Runtime**         | Node.js 18+                                         |
 | **Module format**   | ESM primary (`import`), CJS supported (`require`)   |
 | **Entry point**     | `src/index.ts` → `dist/index.js` / `dist/index.cjs` |

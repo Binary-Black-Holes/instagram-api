@@ -253,11 +253,16 @@ Private replies are limited to one message within 7 days of the comment (during 
 
 ### Webhooks
 
-| SDK method                            | Meta endpoint                          | Notes                               |
-| ------------------------------------- | -------------------------------------- | ----------------------------------- |
-| `client.webhooks.subscribe()`         | `POST /{ig-user-id}/subscribed_apps`   | `subscribed_fields` comma-separated |
-| `client.webhooks.unsubscribe()`       | `DELETE /{ig-user-id}/subscribed_apps` | Aligned                             |
-| `client.webhooks.listSubscriptions()` | `GET /{ig-user-id}/subscribed_apps`    | Aligned                             |
+| SDK method                            | Meta endpoint                                                                 | Notes                               |
+| ------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------- |
+| `client.webhooks.subscribe()`         | Instagram Login: `POST /me/subscribed_apps` on graph.instagram.com            | `subscribed_fields` comma-separated |
+|                                       | Facebook Login: `POST /{ig-user-id}/subscribed_apps` on graph.facebook.com    |                                     |
+| `client.webhooks.unsubscribe()`       | Instagram Login: `DELETE /me/subscribed_apps` on graph.instagram.com          | Aligned                             |
+|                                       | Facebook Login: `DELETE /{ig-user-id}/subscribed_apps` on graph.facebook.com  |                                     |
+| `client.webhooks.listSubscriptions()` | Instagram Login: `GET /me/subscribed_apps` on graph.instagram.com               | Aligned                             |
+|                                       | Facebook Login: `GET /{ig-user-id}/subscribed_apps` on graph.facebook.com     |                                     |
+
+**Instagram Login pitfall:** Webhook subscription must use `/me/subscribed_apps`, not the OAuth `user_id` from code exchange. The SDK forces `/me` automatically. Store `user_id` from `GET /me?fields=user_id,username` (via `client.users.resolveProfessionalAccountId()`) for matching webhook `recipient.id`, not for subscription paths.
 
 Reference: [Webhooks](https://developers.facebook.com/docs/instagram-platform/webhooks)
 

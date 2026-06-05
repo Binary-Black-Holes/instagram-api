@@ -7,6 +7,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [0.3.1] - 2026-06-05
+
+### Fixed
+
+- Fixed Instagram Login webhook subscription to always call `/me/subscribed_apps` instead of the OAuth `user_id` when `instagramAccountId` is set on `InstagramClient`
+
+### Added
+
+- Added `UsersResource.resolveProfessionalAccountId()` to fetch the Instagram Professional Account ID from `/me` for webhook `recipient.id` matching
+
 ## [0.3.0] - 2026-06-04
 
 ### Added
@@ -66,6 +78,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Axios-based HTTP transport with retries, timeouts, optional hooks, and typed error mapping
 - ESM and CJS builds with TypeScript declarations and source maps
 
+[0.3.1]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.2.0
 [0.1.2]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.1.2

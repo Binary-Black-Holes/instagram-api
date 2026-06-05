@@ -82,6 +82,22 @@ export class UsersResource extends BaseResource {
   }
 
   /**
+   * Returns the Instagram Professional Account ID from `/me` for Instagram Login.
+   *
+   * Use this value to match webhook `recipient.id`, not for webhook subscription
+   * paths (those always use `/me/subscribed_apps`).
+   */
+  async resolveProfessionalAccountId(): Promise<string> {
+    const profile = await this.getProfile({ fields: ['user_id'] });
+
+    if (!profile.user_id) {
+      throw new ValidationError('user_id missing from /me');
+    }
+
+    return String(profile.user_id);
+  }
+
+  /**
    * Lists media published by the configured Instagram account.
    *
    * @param options - Pagination and field selection options.

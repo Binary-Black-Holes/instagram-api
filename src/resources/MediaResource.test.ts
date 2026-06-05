@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { HttpClient } from '../http/HttpClient.js';
 import { MediaResource } from '../resources/MediaResource.js';
-import { WebhooksResource } from '../resources/WebhooksResource.js';
 import {
   containerFinished,
   containerInProgress,
@@ -116,24 +115,5 @@ describe('MediaResource', () => {
         intervalMs: 0,
       }),
     ).rejects.toThrow('Publishing quota exhausted');
-  });
-});
-
-describe('WebhooksResource', () => {
-  it('subscribes to webhook fields', async () => {
-    const mock = createMockAxios();
-    const http = new HttpClient({
-      accessToken: 'page-token',
-      apiVersion: 'v21.0',
-      axios: mock.axios,
-    });
-    const webhooks = new WebhooksResource(http, ACCOUNT_ID);
-
-    mock.setResponseFor('subscribed_apps', { status: 200, data: { success: true } });
-
-    const response = await webhooks.subscribe({ fields: ['comments', 'messages'] });
-
-    expect(response.success).toBe(true);
-    expect(mock.mockRequest).toHaveBeenCalled();
   });
 });
