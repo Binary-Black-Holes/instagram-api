@@ -1,4 +1,3 @@
-import axios, { AxiosError, type AxiosInstance } from 'axios';
 import { createErrorFromResponse } from '../errors/index.js';
 import type {
   HttpClientHooks,
@@ -17,6 +16,13 @@ import {
 } from '../types/common.js';
 import { pickDefined } from '../utils/pickDefined.js';
 import { buildQueryString, joinUrl, parseRetryAfterMs, sleep } from '../utils/url.js';
+import {
+  HttpTimeoutError,
+  resolveHttpTransport,
+  type HttpTransport,
+  type HttpTransportConfig,
+} from './HttpTransport.js';
+import type { AxiosInstance } from 'axios';
 
 const DEFAULT_RETRY_POLICY: RetryPolicy = {
   maxRetries: 2,
@@ -46,9 +52,9 @@ class ConsoleLogger implements Logger {
 }
 
 /**
- * Normalizes Axios response headers into a plain string map.
+ * Normalizes transport response headers into a plain string map.
  *
- * @param headers - Axios response headers.
+ * @param headers - Transport response headers.
  * @returns Header key/value map.
  */
 function normalizeHeaders(headers: unknown): Record<string, string> {
@@ -88,15 +94,17 @@ function getRetryAfterMs(headers: Record<string, string>): number | undefined {
 /**
  * Low-level HTTP transport for Graph API requests.
  *
- * Uses Axios for request execution and handles URL construction, authentication
- * query params, retries, timeouts, and error normalization.
+ * Uses a pluggable {@link HttpTransport} for request execution and handles URL
+ * construction, authentication query params, retries, timeouts, and error
+ * normalization.
  */
 export class HttpClient {
   private accessToken: string;
   private readonly apiVersion: GraphApiVersion;
   private readonly loginType: LoginType;
   private readonly graphApiBaseUrl: string;
-  private readonly axios: AxiosInstance;
+  private readonly transport: HttpTransport;
+  private readonly axiosInstance: AxiosInstance | undefined;
   private readonly logger: Logger;
   private readonly timeoutMs: number;
   private readonly retryPolicy: RetryPolicy;
@@ -105,16 +113,17 @@ export class HttpClient {
   /**
    * @param config - HTTP client configuration.
    */
-  constructor(config: {
-    accessToken: string;
-    apiVersion: GraphApiVersion;
-    loginType?: LoginType;
-    axios?: AxiosInstance;
-    logger?: Logger;
-    timeoutMs?: number;
-    retry?: Partial<RetryPolicy>;
-    hooks?: HttpClientHooks;
-  }) {
+  constructor(
+    config: {
+      accessToken: string;
+      apiVersion: GraphApiVersion;
+      loginType?: LoginType;
+      logger?: Logger;
+      timeoutMs?: number;
+      retry?: Partial<RetryPolicy>;
+      hooks?: HttpClientHooks;
+    } & HttpTransportConfig,
+  ) {
     this.accessToken = config.accessToken;
     this.apiVersion = config.apiVersion;
     this.loginType = config.loginType ?? 'facebook';
@@ -127,15 +136,17 @@ export class HttpClient {
       ...DEFAULT_RETRY_POLICY,
       ...config.retry,
     };
-    this.axios =
-      config.axios ??
-      axios.create({
-        timeout: this.timeoutMs,
-        headers: {
-          Accept: 'application/json',
-        },
-        validateStatus: () => true,
-      });
+
+    const resolved = resolveHttpTransport({
+      ...pickDefined({
+        httpTransport: config.httpTransport,
+        fetch: config.fetch,
+        axios: config.axios,
+      }),
+      timeoutMs: this.timeoutMs,
+    });
+    this.transport = resolved.transport;
+    this.axiosInstance = resolved.axiosInstance;
   }
 
   /**
@@ -148,10 +159,17 @@ export class HttpClient {
   }
 
   /**
-   * Returns the underlying Axios instance used by this client.
+   * Returns the underlying Axios instance when Axios is the configured transport.
    */
-  getAxiosInstance(): AxiosInstance {
-    return this.axios;
+  getAxiosInstance(): AxiosInstance | undefined {
+    return this.axiosInstance;
+  }
+
+  /**
+   * Returns the configured HTTP transport implementation.
+   */
+  getHttpTransport(): HttpTransport {
+    return this.transport;
   }
 
   /**
@@ -182,20 +200,20 @@ export class HttpClient {
   }): Promise<{ success?: boolean; message?: string }> {
     const token = config.accessToken ?? this.accessToken;
     const url = joinUrl(RUPLOAD_BASE_URL, 'ig-api-upload', this.apiVersion, config.containerId);
-    const response = await this.axios.post<{ success?: boolean; message?: string } & GraphApiErrorResponse>(
+    const response = await this.transport.request<
+      { success?: boolean; message?: string } & GraphApiErrorResponse
+    >({
       url,
-      config.file,
-      {
-        timeout: this.timeoutMs,
-        headers: {
-          Authorization: `OAuth ${token}`,
-          offset: String(config.offset ?? 0),
-          file_size: String(config.fileSize),
-          'Content-Type': 'application/octet-stream',
-        },
-        validateStatus: () => true,
+      method: 'POST',
+      timeoutMs: this.timeoutMs,
+      headers: {
+        Authorization: `OAuth ${token}`,
+        offset: String(config.offset ?? 0),
+        file_size: String(config.fileSize),
+        'Content-Type': 'application/octet-stream',
       },
-    );
+      body: config.file,
+    });
 
     const payload = response.data;
 
@@ -235,15 +253,15 @@ export class HttpClient {
         });
         this.hooks?.onRequest?.({ method, path: config.path, url });
 
-        const response = await this.axios.request<T | GraphApiErrorResponse>({
+        const response = await this.transport.request<T | GraphApiErrorResponse>({
           url,
           method,
-          timeout: this.timeoutMs,
+          timeoutMs: this.timeoutMs,
           headers: {
             Accept: 'application/json',
             ...(method === 'POST' && config.body ? { 'Content-Type': 'application/json' } : {}),
           },
-          ...(method === 'POST' && config.body ? { data: config.body } : {}),
+          body: method === 'POST' && config.body ? config.body : undefined,
         });
 
         const payload = response.data;
@@ -292,9 +310,9 @@ export class HttpClient {
           headers,
         };
       } catch (error) {
-        if (error instanceof AxiosError && error.code === 'ECONNABORTED') {
+        if (error instanceof HttpTimeoutError) {
           const timeoutError = createErrorFromResponse(408, {
-            message: `Request timed out after ${this.timeoutMs}ms`,
+            message: error.message,
             type: 'TimeoutError',
             code: 408,
           });

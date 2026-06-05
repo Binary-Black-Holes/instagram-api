@@ -13,7 +13,7 @@ For Meta endpoint mapping and verification checklists, see [docs/API_ALIGNMENT.m
 | Field               | Value                                               |
 | ------------------- | --------------------------------------------------- |
 | **npm name**        | `@binary-black-holes/instagram-api`                 |
-| **Version**         | `0.3.1` (also exported as `VERSION` constant)       |
+| **Version**         | `0.4.0` (also exported as `VERSION` constant)       |
 | **Runtime**         | Node.js 18+                                         |
 | **Module format**   | ESM primary (`import`), CJS supported (`require`)   |
 | **Entry point**     | `src/index.ts` → `dist/index.js` / `dist/index.cjs` |
@@ -276,7 +276,7 @@ npm run build       # typecheck + vite library build → dist/
 | Using Basic Display API endpoints                          | This SDK's Graph API resources only                               |
 | Parsing webhook JSON before signature check                | `parseVerifiedWebhookPayload(rawBody, …)`                         |
 | Requesting deprecated `impressions` metric                 | Use `views`                                                       |
-| Adding `fetch` instead of Axios                            | Extend `HttpClient` or pass custom `axios` instance               |
+| Adding raw `fetch` calls in resources                      | Pass `httpTransport`, `fetch`, or `axios` via client config       |
 | Creating a second HTTP client per resource                 | Resources share `InstagramClient`'s `HttpClient`                  |
 
 ---

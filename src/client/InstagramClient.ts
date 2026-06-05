@@ -80,6 +80,8 @@ export class InstagramClient {
       apiVersion: config.apiVersion ?? 'v21.0',
       loginType,
       ...pickDefined({
+        httpTransport: config.httpTransport,
+        fetch: config.fetch,
         axios: config.axios,
         logger: config.logger,
         timeoutMs: config.timeoutMs,

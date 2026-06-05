@@ -1,4 +1,5 @@
 import type { AxiosInstance } from 'axios';
+import type { HttpTransport } from '../http/HttpTransport.js';
 
 /**
  * Supported Instagram Graph API version identifiers.
@@ -180,6 +181,10 @@ export interface InstagramClientConfig {
    * for Instagram Login, where `/me` can be used for user-scoped endpoints.
    */
   instagramAccountId?: string;
+  /** Custom HTTP transport. Takes precedence over `fetch` and `axios`. */
+  httpTransport?: HttpTransport;
+  /** Custom `fetch` implementation (e.g. undici). Used when `httpTransport` is omitted. */
+  fetch?: typeof globalThis.fetch;
   /** Custom Axios instance for HTTP transport, interceptors, or testing. */
   axios?: AxiosInstance;
   /** Optional structured logger. */
@@ -210,6 +215,10 @@ export interface OAuthConfig {
   scopes?: string[];
   /** Graph API version used during OAuth. Defaults to `v21.0`. */
   apiVersion?: GraphApiVersion;
+  /** Custom HTTP transport. Takes precedence over `fetch` and `axios`. */
+  httpTransport?: HttpTransport;
+  /** Custom `fetch` implementation used when `httpTransport` is omitted. */
+  fetch?: typeof globalThis.fetch;
   /** Custom Axios instance for OAuth HTTP requests. */
   axios?: AxiosInstance;
 }

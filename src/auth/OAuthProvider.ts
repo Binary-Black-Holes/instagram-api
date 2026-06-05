@@ -1,4 +1,3 @@
-import axios, { type AxiosInstance } from 'axios';
 import type {
   ConnectedAccountsResponse,
   ListConnectedAccountsOptions,
@@ -23,6 +22,9 @@ import {
 } from '../types/common.js';
 import { ValidationError } from '../errors/index.js';
 import { buildQueryString, joinUrl, resolveFields } from '../utils/url.js';
+import { resolveHttpTransport, type HttpTransport } from '../http/HttpTransport.js';
+import { pickDefined } from '../utils/pickDefined.js';
+import type { AxiosInstance } from 'axios';
 
 /**
  * OAuth helper for Instagram Graph API authorization flows.
@@ -40,7 +42,8 @@ export class OAuthProvider {
   private readonly redirectUri: string;
   private readonly scopes: readonly string[];
   private readonly apiVersion: NonNullable<OAuthConfig['apiVersion']>;
-  private readonly axios: AxiosInstance;
+  private readonly transport: HttpTransport;
+  private readonly axiosInstance: AxiosInstance | undefined;
 
   /**
    * @param config - OAuth provider configuration.
@@ -54,14 +57,16 @@ export class OAuthProvider {
       config.scopes ??
       (this.loginType === 'instagram' ? DEFAULT_INSTAGRAM_LOGIN_SCOPES : DEFAULT_OAUTH_SCOPES);
     this.apiVersion = config.apiVersion ?? 'v21.0';
-    this.axios =
-      config.axios ??
-      axios.create({
-        headers: {
-          Accept: 'application/json',
-        },
-        validateStatus: () => true,
-      });
+
+    const resolved = resolveHttpTransport(
+      pickDefined({
+        httpTransport: config.httpTransport,
+        fetch: config.fetch,
+        axios: config.axios,
+      }),
+    );
+    this.transport = resolved.transport;
+    this.axiosInstance = resolved.axiosInstance;
   }
 
   /**
@@ -235,7 +240,15 @@ export class OAuthProvider {
       access_token: userAccessToken,
     });
     const url = `${joinUrl(GRAPH_API_BASE_URL, this.apiVersion, 'me/accounts')}?${query}`;
-    const response = await this.axios.get<ConnectedAccountsResponse & { error?: { message: string } }>(url);
+    const response = await this.transport.request<
+      ConnectedAccountsResponse & { error?: { message: string } }
+    >({
+      url,
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
     const payload = response.data;
 
     if (response.status < 200 || response.status >= 300 || payload.error) {
@@ -246,10 +259,17 @@ export class OAuthProvider {
   }
 
   /**
-   * Returns the underlying Axios instance used by this provider.
+   * Returns the underlying Axios instance when Axios is the configured transport.
    */
-  getAxiosInstance(): AxiosInstance {
-    return this.axios;
+  getAxiosInstance(): AxiosInstance | undefined {
+    return this.axiosInstance;
+  }
+
+  /**
+   * Returns the configured HTTP transport implementation.
+   */
+  getHttpTransport(): HttpTransport {
+    return this.transport;
   }
 
   private async exchangeInstagramCodeForToken(code: string): Promise<InstagramLoginAccessTokenResponse> {
@@ -282,7 +302,13 @@ export class OAuthProvider {
   private async getFacebookOAuth<T>(path: string, params: Record<string, string>): Promise<T> {
     const query = buildQueryString(params);
     const url = `${joinUrl(GRAPH_API_BASE_URL, this.apiVersion, path)}?${query}`;
-    const response = await this.axios.get<T & { error?: { message: string } }>(url);
+    const response = await this.transport.request<T & { error?: { message: string } }>({
+      url,
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
     const payload = response.data;
 
     if (response.status < 200 || response.status >= 300 || payload.error) {
@@ -295,7 +321,13 @@ export class OAuthProvider {
   private async getInstagramGraph<T>(path: string, params: Record<string, string>): Promise<T> {
     const query = buildQueryString(params);
     const url = `${joinUrl(INSTAGRAM_GRAPH_API_BASE_URL, path)}?${query}`;
-    const response = await this.axios.get<T & { error?: { message: string } }>(url);
+    const response = await this.transport.request<T & { error?: { message: string } }>({
+      url,
+      method: 'GET',
+      headers: {
+        Accept: 'application/json',
+      },
+    });
     const payload = response.data;
 
     if (response.status < 200 || response.status >= 300 || payload.error) {
@@ -312,11 +344,14 @@ export class OAuthProvider {
 
   private async postForm<T>(url: string, params: Record<string, string>): Promise<T> {
     const body = new URLSearchParams(params);
-    const response = await this.axios.post<T & { error?: { message: string } }>(url, body, {
+    const response = await this.transport.request<T & { error?: { message: string } }>({
+      url,
+      method: 'POST',
       headers: {
         Accept: 'application/json',
         'Content-Type': 'application/x-www-form-urlencoded',
       },
+      body,
     });
     const payload = response.data;
 

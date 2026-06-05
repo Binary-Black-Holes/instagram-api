@@ -7,7 +7,19 @@
 
 export { InstagramClient } from './client/index.js';
 export { OAuthProvider } from './auth/index.js';
-export { HttpClient } from './http/index.js';
+export {
+  HttpClient,
+  createAxiosTransport,
+  createFetchTransport,
+  HttpTimeoutError,
+  resolveHttpTransport,
+} from './http/index.js';
+export type {
+  HttpTransport,
+  HttpTransportConfig,
+  HttpTransportRequestConfig,
+  HttpTransportResponse,
+} from './http/index.js';
 
 export {
   InstagramApiError,
@@ -192,4 +204,4 @@ export {
 export { iteratePages, collectAllPages } from './utils/index.js';
 export type { WithoutUndefined } from './utils/index.js';
 
-export const VERSION = '0.3.1';
+export const VERSION = '0.4.0';

@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-06-05
+
+### Added
+
+- Added pluggable HTTP transport via `httpTransport`, `fetch`, or `axios` on `InstagramClient` and `OAuthProvider`, with exported `HttpTransport` interface plus `createAxiosTransport()` and `createFetchTransport()` adapters
+
 ## [0.3.1] - 2026-06-05
 
 ### Fixed
@@ -78,6 +84,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Axios-based HTTP transport with retries, timeouts, optional hooks, and typed error mapping
 - ESM and CJS builds with TypeScript declarations and source maps
 
+[0.4.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.4.0
 [0.3.1]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.3.0
 [0.2.0]: https://github.com/Binary-Black-Holes/instagram-api/releases/tag/v0.2.0
